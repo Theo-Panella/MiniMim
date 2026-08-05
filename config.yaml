@@ -1,0 +1,28 @@
+# Arquivo de Configuração - Usuario decide qual serviço devem ser filtrados, e inserir os tipos de logs que devem ser filtrados
+# Melhora consideravel em customização de filtragem inicial para cada caso
+# A pré filtragem deve ser sempre do mais especifico para o mais genérico
+
+Flask:
+    admin_access_accepted:
+        padrao: ' flask\[\d+\]: Accepted password for admin from .*'
+        especificidade: 10
+    admin_access_failed:
+        padrao: ' flask\[\d+\]: Failed password for admin from .*'
+        especificidade: 10
+    recon_by_trying_access_inexistent_page:
+        padrao: ' flask\[\d+\]: 404 Not Found: /.*'
+        especificidade: 5
+    normal_access_failed:
+        padrao: ' flask\[\d+\]: Failed password for .*'
+        especificidade: 1
+    normal_access_accepted:
+        padrao: ' flask\[\d+\]: Accepted password for .* from .*'
+        especificidade: 1
+
+Nginx:
+    Failure:
+        padrao: 'nerdy-web flask\[\d+\]: Failed password for .'
+        especificidade: 1
+    Accepted:
+        padrao: 'nerdy-web flask\[\d+\]: Accepted password for'
+        especificidade: 1
