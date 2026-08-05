@@ -2,22 +2,13 @@
 # Melhora consideravel em customização de filtragem inicial para cada caso
 # A pré filtragem deve ser sempre do mais especifico para o mais genérico
 
-Flask:
-    admin_access_accepted:
-        padrao: ' flask\[\d+\]: Accepted password for admin from .*'
-        especificidade: 10
-    admin_access_failed:
-        padrao: ' flask\[\d+\]: Failed password for admin from .*'
-        especificidade: 10
-    recon_by_trying_access_inexistent_page:
-        padrao: ' flask\[\d+\]: 404 Not Found: /.*'
-        especificidade: 5
-    normal_access_failed:
-        padrao: ' flask\[\d+\]: Failed password for .*'
-        especificidade: 1
-    normal_access_accepted:
-        padrao: ' flask\[\d+\]: Accepted password for .* from .*'
-        especificidade: 1
+Apache:
+    teste-1:
+        padrao: '^\[.*\] \[error\] \[client .*\] Directory index forbidden by rule: .'
+        especificidade: 3
+    teste-2:
+        padrao: '^\[.*\] \[notice\] workerEnv.init().'
+        especificidade: 3
 
 Nginx:
     Failure:

@@ -4,6 +4,9 @@ Agente leve de coleta e pré-filtragem de logs. Ele monitora um arquivo de log e
 
 A ideia é fazer a triagem **na ponta**: em vez de mandar o log inteiro para o servidor central, o MiniMim decide localmente o que é relevante e qual o tipo do evento, reduzindo tráfego e trabalho de processamento no centralizador.
 
+> **Referencia** - Estamos utilizando o projeto [loghub](https://github.com/logpai/loghub.git) como base de analise, todos os logs utilizados vem do repositorio
+
+
 ---
 
 ## Como funciona

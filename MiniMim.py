@@ -10,15 +10,12 @@ from watchdog.observers import Observer
 
 
 # Variaveis globais
-lista_de_servico = ['Flask']
+lista_de_servico = ['Apache']
 
-#config = configparser.ConfigParser()
 load_dotenv()
-#config.read('ConfigurationFiles/paths.conf')
 caminho_de_configuracao = os.getenv('CONFIGURATION_FILE')
 file_name = os.getenv('LOG_FILE_NAME')
 log_path = os.getenv('LOG_PATH')
-print(log_path)
 log_path_completo = log_path + file_name
 
 
@@ -62,7 +59,8 @@ def pre_filtro(ultimas_linhas, regras):
                     print(f'Log do servico {servico} e Tipo {regra["id"]} encontrado, '
                           f'aplicando pre-filtro do {servico}: {regra["id"]}')
                     break
-
+                else:
+                    pass
 
 def envio_para_API(log, servico, tipo):
     """Envia o log classificado para o centralizador."""
@@ -88,7 +86,7 @@ class MyEventHandler(FileSystemEventHandler):
 
     def on_any_event(self, event: FileSystemEvent) -> None:
         if event.src_path == log_path_completo and event.event_type == "modified":
-            print("Nova tentativa de Login detectada")
+            #print("Nova tentativa de Login detectada")
 
             with open(log_path_completo, "r", encoding="utf-8") as f:
                 f.seek(self._pos)
