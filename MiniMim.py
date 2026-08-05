@@ -1,30 +1,36 @@
-#====================================================================================
-import time
+import os
+from dotenv import load_dotenv
 import re
+import time
+
+import requests
 import yaml
-from collections import deque
-from watchdog.events import FileSystemEvent, FileSystemEventHandler,FileModifiedEvent
+from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
-#====================================================================================
 
 
-#====================================================================================
-# Variaveis Globais
+# Variaveis globais
 lista_de_servico = ['Flask']
-caminho_de_configuracao = "/Minimim/config.yaml"
-caminho_de_log = '/Material/logs_colector.txt'
-#====================================================================================
+
+#config = configparser.ConfigParser()
+load_dotenv()
+#config.read('ConfigurationFiles/paths.conf')
+caminho_de_configuracao = os.getenv('CONFIGURATION_FILE')
+file_name = os.getenv('LOG_FILE_NAME')
+log_path = os.getenv('LOG_PATH')
+print(log_path)
+log_path_completo = log_path + file_name
 
 
-#====================================================================================
-# Abre o arquivo de Configuracao e compila para melhor desempenho
-# Abre regras individualmente, tem mais processamento na primeira rodagem por compilar
-# todas as configurações inicialmente
+# Abre o arquivo de configuracao e compila os padroes para melhor desempenho.
+# Tem mais processamento na primeira rodagem por compilar todas as regras de uma vez.
 with open(caminho_de_configuracao, 'r') as arquivo_de_configuracao_puro:
     configuracao = yaml.safe_load(arquivo_de_configuracao_puro)
 
 # Para cada servico gera uma LISTA de regras ja ordenada da mais especifica
 # para a mais generica (maior especificidade primeiro), com o padrao compilado.
+# EX: Flask: [{id: padraoA, padrao: <compile>, especificidade: 10},
+#             {id: padraoB, padrao: <compile>, especificidade: 1}, ...]
 regras = {
     servico: sorted(
         [
@@ -39,48 +45,31 @@ regras = {
     )
     for servico, padroes in configuracao.items()
 }
-#====================================================================================
 
 
-#====================================================================================
-# Funcao de pre_Filtro
-def pre_filter(ultimas_linhas,regras):
-    # Pega cada linha da ultima linha lida, default = 1
+def pre_filtro(ultimas_linhas, regras):
+    """Classifica cada linha nova lida do log; o primeiro match (mais especifico) vence."""
     for cada_linha in ultimas_linhas:
         linha = cada_linha.strip()
 
         for servico, regras_do_servico in regras.items():
             if servico not in lista_de_servico:
                 continue
-            ''' Pega cada serviço e sua lista de regras (ja ordenada da mais
-                especifica para a mais generica).
-                Cada regra tem: id, padrao (compilado) e especificidade.
-                EX: Servico:
-                        - {id: IDpadraoA, padrao: <compile>, especificidade: 10}
-                        - {id: IDpadraoB, padrao: <compile>, especificidade: 1}
-                        ...
-            '''
+
             for regra in regras_do_servico:
-                # Verifica se atende o padrao; o primeiro match (mais especifico) vence
                 if regra["padrao"].search(linha):
-                    envio_para_API(linha, servico, regra["id"])
-                    #print(f'Log do servico {servico} e Tipo {regra["id"]} encontrado, aplicando pre-filtro do {servico}: {regra["id"]}')
-                    #with open("Material/minimim.txt", "a") as file:
-                    #    file.write(linha + "\n")
+                    #envio_para_API(linha, servico, regra["id"])
+                    print(f'Log do servico {servico} e Tipo {regra["id"]} encontrado, '
+                          f'aplicando pre-filtro do {servico}: {regra["id"]}')
                     break
-# Todo o PRE-FILTRO, precisa de uma função com essa mesma logica,
-#====================================================================================
 
-#====================================================================================
-# Envio do log para API
+
 def envio_para_API(log, servico, tipo):
-    # Aqui você pode implementar a lógica para enviar o log para a API
-    # Por exemplo, usando a biblioteca requests para fazer uma requisição POST
-    import requests
-
+    """Envia o log classificado para o centralizador."""
     url = "http://127.0.0.1:8000"  # Substitua pelo endpoint da sua API
     headers = {"Content-Type": "application/json"}
-    data = {"servico": servico,"log": log, "tipo": tipo}  # Você pode ajustar os dados conforme necessário
+    data = {"servico": servico, "log": log, "tipo": tipo}
+
     try:
         response = requests.post(url, json=data, headers=headers)
         if response.status_code == 200:
@@ -91,37 +80,33 @@ def envio_para_API(log, servico, tipo):
         print(f"Erro ao enviar log: {e}")
 
 
-#====================================================================================
-# Classe evento do Watchdog
 class MyEventHandler(FileSystemEventHandler):
     def __init__(self):
-        self._pos = 0          # Posicao inicial (Na primeira vez rodando faz ingestão inicial e depois continua apartir da ultima)
+        # Posicao da ultima leitura: na primeira vez faz a ingestao inicial
+        # e depois continua a partir de onde parou.
+        self._pos = 0
 
     def on_any_event(self, event: FileSystemEvent) -> None:
-        if event.src_path == caminho_de_log and event.event_type == "modified":
-            #print("Nova tentativa de Login detectada")
-            #print("Analisando log...")
-            with open(caminho_de_log, "r", encoding="utf-8") as f:
-                #ultimas_linhas = deque(f, maxlen=quantidade_de_ultimas_linhas)
+        if event.src_path == log_path_completo and event.event_type == "modified":
+            print("Nova tentativa de Login detectada")
+
+            with open(log_path_completo, "r", encoding="utf-8") as f:
                 f.seek(self._pos)
                 novas_linhas = f.readlines()
                 self._pos = f.tell()
-                pre_filter(novas_linhas,regras)
-#====================================================================================
+                pre_filtro(novas_linhas, regras)
 
 
-#====================================================================================
-#Chama evento e mantem em loop
 if __name__ == "__main__":
     event_handler = MyEventHandler()
     observer = Observer()
-    observer.schedule(event_handler, ".", recursive=True)
+    observer.schedule(event_handler, log_path, recursive=True)
     observer.start()
+
     print("Analisando log...")
-    try:    
+    try:
         while True:
             time.sleep(2)
     finally:
         observer.stop()
         observer.join()
-#====================================================================================
