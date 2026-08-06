@@ -8,18 +8,12 @@ import yaml
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
-
-# Variaveis globais
-lista_de_servico = ['Apache']
-
 load_dotenv()
 caminho_de_configuracao = os.getenv('CONFIGURATION_FILE')
 padrao_split = os.getenv('PADRAO_SPLIT')
 log_file = os.getenv('LOG_FILE')
 log_path = os.getenv('LOG_PATH').split(',')
 global_path = os.getenv('GLOBAL_PATH')
-
-
 
 
 # Abre o arquivo de configuracao e compila os padroes para melhor desempenho.
@@ -29,6 +23,72 @@ with open(caminho_de_configuracao, 'r') as arquivo_de_configuracao_puro:
     
 relacao_pos_file = {}
 
+regras = {
+    servico: sorted(
+        [
+            {
+                "id": id_padrao,
+                "padrao": re.compile(regra["padrao"]),
+                "especificidade": regra.get("especificidade", 0),
+            }
+            for id_padrao, regra in padroes.items()
+        ],
+        key=lambda r: -r["especificidade"],
+    )
+    for servico, padroes in configuracao.items()
+}
+
+def pre_filtro(ultimas_linhas, regras, servico_do_evento):
+    """Classifica cada linha nova lida do log; o primeiro match (mais especifico) vence."""
+    for cada_linha in ultimas_linhas:
+        linha = cada_linha.strip()
+        
+        for servico, regras_do_servico in regras.items():
+            if servico == servico_do_evento:
+                for regra in regras_do_servico:
+                    if regra["padrao"].search(linha):
+                        print(f'Log do servico {servico} e Tipo {regra["id"]} encontrado')
+                        break
+                    else:
+                        pass
+
+
+def ler_arquivo(evento):
+    try:
+        with open(evento, "r", encoding="utf-8") as file:
+            pos_inicial = relacao_pos_file[evento]
+            file.seek(pos_inicial)
+            #print(pos_inicial)
+            conteudo = file.read()
+
+            ultima_quebra = conteudo.rfind("\n")
+            if ultima_quebra == -1:
+                # ainda nao ha nenhuma linha completa, espera o proximo evento
+                return
+
+            completo = conteudo[:ultima_quebra + 1]
+            novas_linhas = completo.splitlines()
+            
+            # Reposiciona exatamente no fim da ultima linha completa.
+            # seek() em modo texto so aceita posicoes vindas de tell(),
+            # entao relemos so o trecho completo para obter uma posicao valida.
+            file.seek(pos_inicial)
+            file.read(len(completo))
+            relacao_pos_file[evento] = pos_inicial + len(completo)
+            #print(relacao_pos_file)
+            servico_do_evento = os.path.basename(os.path.dirname(evento))
+            pre_filtro(novas_linhas, regras, servico_do_evento)
+            #print(novas_linhas)
+    
+                        
+    except (PermissionError, IOError):
+        #Ocorre se o arquivo estiver aberto por outro processo de escrita
+        #print("O arquivo está em uso ou sendo escrito no momento. Nenhuma leitura foi feita.")
+        pass
+    
+    
+
+
 class MyEventHandler(FileSystemEventHandler):
     def __init__(self):
         # Posicao da ultima leitura: na primeira vez faz a ingestao inicial
@@ -36,22 +96,11 @@ class MyEventHandler(FileSystemEventHandler):
         self._pos = 0
 
     def on_any_event(self, event: FileSystemEvent) -> None:
-        if event.event_type == "modified":
+        if event.event_type == "modified" and not event.is_directory:
             print(f"Teve evento no {event.src_path}")
-            with open(event.src_path, "r", encoding="utf-8") as file:
-                # Procura a ultima linha lida
-                file.seek(relacao_pos_file[event.src_path])
-                # Le as linhas adicionais
-                novas_linhas = file.readlines()
-                # Diz a ultima linha lida
-                self._pos = file.tell()
+            ler_arquivo(event.src_path)
 
-                relacao_pos_file[event.src_path] = [self._pos]
-
-                # Printa a posicao de leitura
-                print(relacao_pos_file)
-                #print(relacao_pos_file)
-
+            
 
 if __name__ == "__main__":
     event_handler = MyEventHandler()
@@ -59,7 +108,7 @@ if __name__ == "__main__":
 
     for each in log_path:
         observer.schedule(event_handler, each, recursive=False)
-        relacao_pos_file[each] = {}
+        relacao_pos_file[each] = 0
 
     observer.start()
 
