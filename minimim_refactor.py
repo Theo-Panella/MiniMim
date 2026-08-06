@@ -15,9 +15,11 @@ lista_de_servico = ['Apache']
 load_dotenv()
 caminho_de_configuracao = os.getenv('CONFIGURATION_FILE')
 padrao_split = os.getenv('PADRAO_SPLIT')
-#file_name = os.getenv('LOG_FILE_NAME')
+log_file = os.getenv('LOG_FILE')
 log_path = os.getenv('LOG_PATH').split(',')
 global_path = os.getenv('GLOBAL_PATH')
+
+
 
 
 # Abre o arquivo de configuracao e compila os padroes para melhor desempenho.
@@ -25,7 +27,7 @@ global_path = os.getenv('GLOBAL_PATH')
 with open(caminho_de_configuracao, 'r') as arquivo_de_configuracao_puro:
     configuracao = yaml.safe_load(arquivo_de_configuracao_puro)
     
-
+relacao_pos_file = {}
 
 class MyEventHandler(FileSystemEventHandler):
     def __init__(self):
@@ -34,20 +36,20 @@ class MyEventHandler(FileSystemEventHandler):
         self._pos = 0
 
     def on_any_event(self, event: FileSystemEvent) -> None:
-
-        if (event.src_path in log_path) and event.event_type == "modified":
+        if event.event_type == "modified":
             print(f"Teve evento no {event.src_path}")
-            
             with open(event.src_path, "r", encoding="utf-8") as file:
                 # Procura a ultima linha lida
-                #file.seek(relacao_pos_file[event.src_path])
+                file.seek(relacao_pos_file[event.src_path])
                 # Le as linhas adicionais
                 novas_linhas = file.readlines()
                 # Diz a ultima linha lida
                 self._pos = file.tell()
-                #relacao_pos_file[each] = [self._pos]
+
+                relacao_pos_file[event.src_path] = [self._pos]
+
                 # Printa a posicao de leitura
-                #print(self._pos)
+                print(relacao_pos_file)
                 #print(relacao_pos_file)
 
 
@@ -57,6 +59,7 @@ if __name__ == "__main__":
 
     for each in log_path:
         observer.schedule(event_handler, each, recursive=False)
+        relacao_pos_file[each] = {}
 
     observer.start()
 
