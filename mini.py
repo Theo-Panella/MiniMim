@@ -5,7 +5,7 @@ import os
 from dotenv import load_dotenv
 
 def main(log_path):
-    parser = argparse.ArgumentParser(prog='MiniMim',description='The best CLI agent in Limeira/SP')
+    parser = argparse.ArgumentParser(prog='MiniMim',description='The best CLI agent in my neighborhood')
 
     parser.add_argument('-l', '--load', action='store_true' , help="Do the first load using the .env config")
 
