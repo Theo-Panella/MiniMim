@@ -10,10 +10,19 @@ Apache:
         padrao: '^\[.*\] \[notice\] workerEnv.init().'
         especificidade: 3
 
-Nginx:
-    Failure:
-        padrao: 'nerdy-web flask\[\d+\]: Failed password for .'
-        especificidade: 1
+Openssh:
+    BreakInAttempt:
+        padrao: 'POSSIBLE BREAK-IN ATTEMPT'
+        especificidade: 5
+    FailedInvalidUser:
+        padrao: 'sshd\[\d+\]: Failed password for invalid user \S+ from '
+        especificidade: 4
+    FailedPassword:
+        padrao: 'sshd\[\d+\]: Failed password for \S+ from '
+        especificidade: 3
+    InvalidUser:
+        padrao: 'sshd\[\d+\]: Invalid user \S+ from '
+        especificidade: 2
     Accepted:
-        padrao: 'nerdy-web flask\[\d+\]: Accepted password for'
+        padrao: 'sshd\[\d+\]: Accepted password for \S+ from '
         especificidade: 1
