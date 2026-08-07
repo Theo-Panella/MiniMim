@@ -44,7 +44,7 @@ def pre_filtro(ultimas_linhas, regras, servico_do_evento):
             if servico == servico_do_evento:
                 for regra in regras_do_servico:
                     if regra["padrao"].search(linha):
-                        print(f'Log do servico {servico} e Tipo {regra["id"]} encontrado, Linha: {linha}')
+                        #print(f'Log do servico {servico} e Tipo {regra["id"]} encontrado, Linha: {linha}')
                         break
                     else:
                         pass
@@ -80,6 +80,7 @@ def ler_arquivo(evento):
             relacao_pos_file[evento] = pos_inicial + len(completo)
             servico_do_evento = os.path.basename(os.path.dirname(evento))
             pre_filtro(novas_linhas, regras, servico_do_evento)
+            print(relacao_pos_file)
     
                         
     except (PermissionError, IOError):
@@ -88,21 +89,7 @@ def ler_arquivo(evento):
         pass
     
     
-
-
-class MyEventHandler(FileSystemEventHandler):
-    def __init__(self):
-        # Posicao da ultima leitura: na primeira vez faz a ingestao inicial
-        # e depois continua a partir de onde parou.
-        self._pos = 0
-        
-    def on_any_event(self, event: FileSystemEvent) -> None:
-        if event.event_type == "modified" and not event.is_directory:
-            popula_indice(event.src_path)
-
-            
-
-if __name__ == "__main__":
+def cria_observer():
     event_handler = MyEventHandler()
     observer = Observer()
 
@@ -119,3 +106,18 @@ if __name__ == "__main__":
         print("Acabou")
         observer.stop()
         observer.join()
+
+
+class MyEventHandler(FileSystemEventHandler):
+    def __init__(self):
+        # Posicao da ultima leitura: na primeira vez faz a ingestao inicial
+        # e depois continua a partir de onde parou.
+        self._pos = 0
+        
+    def on_any_event(self, event: FileSystemEvent) -> None:
+        if event.event_type == "modified" and not event.is_directory:
+            popula_indice(event.src_path)
+
+
+if __name__ == "__main__":
+    cria_observer()
