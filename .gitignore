@@ -2,3 +2,4 @@
 *.conf
 .env
 __*
+ConfigurationFiles/relacao_pos_file.json
