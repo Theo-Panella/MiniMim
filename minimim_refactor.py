@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 import re
 import time
 import json
-
+import logging
 import requests
 import yaml
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
@@ -14,16 +14,15 @@ caminho_de_configuracao = os.getenv('CONFIGURATION_FILE')
 padrao_split = os.getenv('PADRAO_SPLIT')
 log_path = os.getenv('LOG_PATH').split(',')
 path_arquivo_json = "ConfigurationFiles/relacao_pos_file.json"
+log = logging.getLogger(__name__)
 
 # Abre o arquivo de configuracao e compila os padroes para melhor desempenho.
 # Tem mais processamento na primeira rodagem por compilar todas as regras de uma vez.
 with open(caminho_de_configuracao, 'r') as arquivo_de_configuracao_puro:
     configuracao = yaml.safe_load(arquivo_de_configuracao_puro)
 
-
 with open(path_arquivo_json, 'r') as arquivo_json:
     relacao_pos_file = json.load(arquivo_json)
-
 
 regras = {
     servico: sorted(
@@ -40,23 +39,37 @@ regras = {
     for servico, padroes in configuracao.items()
 }
 
-def pre_filtro(ultimas_linhas, regras, servico_do_evento):
-    """Classifica cada linha nova lida do log; o primeiro match (mais especifico) vence."""
+if __name__ == "__main__":
+    cria_observer()
+
+def cria_observer():
+    event_handler = MyEventHandler()
+    observer = Observer()
+
+    for each in log_path:
+        observer.schedule(event_handler, each, recursive=False)
+
+    observer.start()
+
+    print("Observando...")
     try:
-        regras_do_servico = regras.get(servico_do_evento)
-        if regras_do_servico is None:
-            return              
-        for cada_linha in ultimas_linhas:
-            linha = cada_linha.strip()
-            for regra in regras_do_servico:
-                if regra["padrao"].search(linha):
-                    break
-                else:
-                    pass
-    except Exception:
-        print("Deu erro, corre aqui")
-        pass
-    
+        while True:
+            time.sleep(2)
+    finally:
+        print("Acabou")
+        observer.stop()
+        observer.join()
+
+
+class MyEventHandler(FileSystemEventHandler):
+    def __init__(self):
+        # Posicao da ultima leitura: na primeira vez faz a ingestao inicial
+        # e depois continua a partir de onde parou.
+        self._pos = 0
+        
+    def on_any_event(self, event: FileSystemEvent) -> None:
+        if event.event_type == "modified" and not event.is_directory:
+            popula_indice(event.src_path)
 
 
 def popula_indice(evento):
@@ -90,43 +103,38 @@ def ler_arquivo(evento):
             json.dump(relacao_pos_file,open(path_arquivo_json,"w"))
             pre_filtro(novas_linhas, regras, servico_do_evento)
             #print(relacao_pos_file)
-            
-                        
-    except (PermissionError, IOError):
-        #Ocorre se o arquivo estiver aberto por outro processo de escrita
-        print("O arquivo está em uso ou sendo escrito no momento. Nenhuma leitura foi feita.")
-        pass
+                              
+    except Exception:
+        log.exception("falha no pre_filtro, servico=%s", servico_do_evento)
 
-    
-def cria_observer():
-    event_handler = MyEventHandler()
-    observer = Observer()
-
-    for each in log_path:
-        observer.schedule(event_handler, each, recursive=False)
-
-    observer.start()
-
-    print("Analisando log...")
+def pre_filtro(ultimas_linhas, regras, servico_do_evento):
+    """Classifica cada linha nova lida do log; o primeiro match (mais especifico) vence."""
     try:
-        while True:
-            time.sleep(2)
-    finally:
-        print("Acabou")
-        observer.stop()
-        observer.join()
+        regras_do_servico = regras.get(servico_do_evento)
+        if regras_do_servico is None:
+            return              
+        for cada_linha in ultimas_linhas:
+            linha = cada_linha.strip()
+            for regra in regras_do_servico:
+                if regra["padrao"].search(linha):
+                    envio_para_API(linha,servico_do_evento)
+                    break
+                else:
+                    pass
+    except Exception:
+        log.exception("falha no pre_filtro, servico=%s", servico_do_evento)
 
+def envio_para_API(log, servico):
+    """Envia o log classificado para o centralizador."""
+    url = "http://127.0.0.1:8000"  # Substitua pelo endpoint da sua API
+    headers = {"Content-Type": "application/json"}
+    data = {"servico": servico, "log": log}
 
-class MyEventHandler(FileSystemEventHandler):
-    def __init__(self):
-        # Posicao da ultima leitura: na primeira vez faz a ingestao inicial
-        # e depois continua a partir de onde parou.
-        self._pos = 0
-        
-    def on_any_event(self, event: FileSystemEvent) -> None:
-        if event.event_type == "modified" and not event.is_directory:
-            popula_indice(event.src_path)
-
-
-if __name__ == "__main__":
-    cria_observer()
+    try:
+        response = requests.post(url, json=data, headers=headers)
+        if response.status_code == 200:
+            print(f"Log enviado para centralizador, Status code:{response.status_code}")
+        else:
+            print(f"Falha ao enviar log. Status code: {response.status_code}")
+    except Exception as e:
+        log.exception("Erro ao enviar log: ", e)
