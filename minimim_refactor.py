@@ -14,7 +14,7 @@ caminho_de_configuracao = os.getenv('CONFIGURATION_FILE')
 padrao_split = os.getenv('PADRAO_SPLIT')
 log_path = os.getenv('LOG_PATH').split(',')
 path_arquivo_json = "ConfigurationFiles/relacao_pos_file.json"
-log = logging.getLogger(__name__)
+log_from_logging = logging.getLogger(__name__)
 
 # Abre o arquivo de configuracao e compila os padroes para melhor desempenho.
 # Tem mais processamento na primeira rodagem por compilar todas as regras de uma vez.
@@ -39,8 +39,6 @@ regras = {
     for servico, padroes in configuracao.items()
 }
 
-if __name__ == "__main__":
-    cria_observer()
 
 def cria_observer():
     event_handler = MyEventHandler()
@@ -138,3 +136,6 @@ def envio_para_API(log, servico):
             print(f"Falha ao enviar log. Status code: {response.status_code}")
     except Exception as e:
         log.exception("Erro ao enviar log: ", e)
+
+if __name__ == "__main__":
+    cria_observer()
