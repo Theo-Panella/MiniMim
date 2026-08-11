@@ -16,4 +16,4 @@ dependencies = [
 minicli = "minicli:main"
 
 [tool.setuptools]
-py-modules = ["minicli", "minimim_refactor", "MiniMim"]
+py-modules = ["minicli", "MiniMim"]
