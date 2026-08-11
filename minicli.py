@@ -4,7 +4,7 @@ import os
 import re
 
 import yaml
-from minimim_refactor import cria_observer
+from MiniMim import cria_observer
 from dotenv import load_dotenv, set_key
 
 CAMINHO_ENV = ".env"
@@ -232,7 +232,7 @@ def executa_tutorial():
 
     print("\nPronto. Proximos passos:")
     print("  python minicli.py -start     # carga inicial dos logs existentes")
-    print("  python minimim_refactor.py   # monitoramento continuo")
+    print("  python MiniMim.py   # monitoramento continuo")
 
 
 # --------------------------------------------------------------------------- #
@@ -264,8 +264,8 @@ def main():
         if not log_path:
             print("LOG_PATH nao configurado, rode: python minicli.py --tutorial")
             return
-        # Import tardio: minimim_refactor le o .env no import e exige config valida.
-        from minimim_refactor import popula_indice
+        # Import tardio: MiniMim le o .env no import e exige config valida.
+        from MiniMim import popula_indice
         print("=="*40)
         for workdir in log_path:
             for arquivo in os.scandir(workdir):
@@ -294,4 +294,3 @@ if __name__ == "__main__":
     load_dotenv()
     main()
 
-    

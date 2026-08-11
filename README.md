@@ -13,18 +13,19 @@ A ideia é fazer a triagem **na ponta**: em vez de mandar o log inteiro pra um s
 ```
 MiniMim-Agent/
 ├── minicli.py                 # CLI: tutorial, carga inicial e observação
-├── minimim_refactor.py        # agente principal: watchdog + pré-filtro
+├── MiniMim.py                 # agente principal: watchdog + pré-filtro
 ├── ConfigurationFiles/
 │   ├── filter.yaml            # regras de filtragem, uma seção por serviço
 │   └── relacao_pos_file.json  # índice de leitura por arquivo (não versionado)
 ├── Apache/, Openssh/          # pastas de log de amostra, uma por serviço
+├── legacy/MiniMim.py          # primeira versão, mantida só de referência
 ├── escreve_log_teste.py       # gera linhas de log continuamente, pra teste
 └── .env                       # configuração local (não versionado)
 ```
 
 O nome de cada pasta de log precisa bater com a seção correspondente no `filter.yaml` (ex: `Apache/` ↔ `Apache:`) — é assim que o agente escolhe as regras certas para cada arquivo.
 
-> `MiniMim.py` é a versão original, de um único serviço/arquivo, mantida só de referência. `minimim_refactor.py` é a versão atual.
+> `legacy/MiniMim.py` é a versão original, de um único serviço/arquivo. `MiniMim.py` é a versão atual.
 
 ---
 
@@ -34,7 +35,7 @@ O nome de cada pasta de log precisa bater com a seção correspondente no `filte
 2. O [watchdog](https://pypi.org/project/watchdog/) observa cada diretório listado em `LOG_PATH`. A cada modificação, o agente lê só as linhas novas de cada arquivo e regrava a posição do último `seek` no arquivo de índice, então a leitura continua de onde parou entre execuções.
 3. Cada linha nova é comparada com as regras do serviço deduzido do nome da pasta; o primeiro match — o mais específico — vence.
 
-> **Status:** `envio_para_API()` já faz o POST da linha classificada, mas a chamada está comentada no `pre_filtro` — hoje a classificação acontece sem ser enviada.
+> **Status:** cada linha classificada é enviada por `envio_para_API()`, hoje via POST para um endpoint local fixo (`http://127.0.0.1:8000`).
 
 ---
 
@@ -79,7 +80,8 @@ python minicli.py -b
 
 ## Roadmap
 
-- [x] Envio da linha classificada para uma API central — falta reativar a chamada no `pre_filtro`
+- [x] Envio da linha classificada para uma API central
+- [ ] Tornar o endpoint da API configurável pelo `.env`
 - [x] Unificar as duas entradas num único CLI (`minicli.py`)
 - [ ] Concluir a flag `-clean`, que hoje só pede confirmação
 - [ ] Validar variáveis de ambiente na inicialização
