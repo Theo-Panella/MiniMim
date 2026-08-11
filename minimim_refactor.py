@@ -11,9 +11,8 @@ from watchdog.observers import Observer
 
 load_dotenv()
 caminho_de_configuracao = os.getenv('CONFIGURATION_FILE')
-padrao_split = os.getenv('PADRAO_SPLIT')
 log_path = os.getenv('LOG_PATH').split(',')
-path_arquivo_json = "ConfigurationFiles/relacao_pos_file.json"
+path_arquivo_json = os.getenv('JSON_PATH')
 log_from_logging = logging.getLogger(__name__)
 
 # Abre o arquivo de configuracao e compila os padroes para melhor desempenho.
@@ -116,7 +115,6 @@ def pre_filtro(ultimas_linhas, regras, servico_do_evento):
             for regra in regras_do_servico:
                 if regra["padrao"].search(linha):
                     #envio_para_API(linha,servico_do_evento)
-                    print(f"Achei uma {regra["padrao"]}")
                     break
                 else:
                     pass

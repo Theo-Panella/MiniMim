@@ -242,9 +242,9 @@ def executa_tutorial():
 def main():
     parser = argparse.ArgumentParser(prog='MiniMim', description='The best CLI agent in my neighborhood')
 
-    parser.add_argument('-t','--tutorial', action='store_true', help="Interactive step-by-step setup of the .env and filter.yaml files")
-    parser.add_argument('--start', action='store_true', help="Start MiniMim using the pre done configuration")
-    parser.add_argument('-b','--observe', action='store_true', help="Start observation with the done files")
+    parser.add_argument('-t','--tutorial', action='store_true', help="Interactive step-by-step setup of configuration files")
+    parser.add_argument('-s','--start', action='store_true', help="First load, make the first log colection")
+    parser.add_argument('-b','--observe', action='store_true', help="Start observation")
     parser.add_argument('-clean', help="Clean the path that is ")
 
     args = parser.parse_args()
@@ -257,18 +257,27 @@ def main():
         return
 
     log_path = [p for p in (os.getenv('LOG_PATH') or '').split(',') if p.strip()]
+    path_arquivo_json = os.getenv('JSON_PATH')
     caminho_de_configuracao = os.getenv('CONFIGURATION_FILE')
 
     if args.start:
         if not log_path:
-            print("LOG_PATH nao configurado. Rode: python minicli.py --tutorial")
+            print("LOG_PATH nao configurado, rode: python minicli.py --tutorial")
             return
         # Import tardio: minimim_refactor le o .env no import e exige config valida.
         from minimim_refactor import popula_indice
+        print("=="*40)
         for workdir in log_path:
             for arquivo in os.scandir(workdir):
+                print(f"Populando json do path {workdir}")
                 popula_indice(os.path.join(workdir, arquivo.name))
-                cria_observer()
+        
+        print("Coleta inicial finalizada")
+        print("=="*40)
+        print("Inicie a observação a partir de agora com [minicli -b] ou [minicli --observe]")
+	
+        return
+
     if args.observe:
         cria_observer()
 
@@ -284,3 +293,5 @@ def main():
 if __name__ == "__main__":
     load_dotenv()
     main()
+
+    
