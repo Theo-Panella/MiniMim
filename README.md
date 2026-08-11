@@ -35,7 +35,7 @@ O nome de cada pasta de log precisa bater com a seção correspondente no `filte
 2. O [watchdog](https://pypi.org/project/watchdog/) observa cada diretório listado em `LOG_PATH`. A cada modificação, o agente lê só as linhas novas de cada arquivo e regrava a posição do último `seek` no arquivo de índice, então a leitura continua de onde parou entre execuções.
 3. Cada linha nova é comparada com as regras do serviço deduzido do nome da pasta; o primeiro match — o mais específico — vence.
 
-> **Status:** cada linha classificada é enviada por `envio_para_API()`, hoje via POST para um endpoint local fixo (`http://127.0.0.1:8000`).
+> **Status:** a chamada do `pre_filtro` está comentada no `ler_arquivo` — a leitura incremental roda e grava o índice, mas nada é classificado nem enviado no momento. Quando ativa, cada linha que casa vai para `envio_para_API()`, via POST para um endpoint local fixo (`http://127.0.0.1:8000`).
 
 ---
 
@@ -68,6 +68,12 @@ Carga inicial (lê o que já existe nos logs):
 python minicli.py -s
 ```
 
+Recarga a partir do fim do arquivo, para os que já estão no índice:
+
+```bash
+python minicli.py -rfl
+```
+
 Monitoramento contínuo:
 
 ```bash
@@ -85,4 +91,5 @@ python minicli.py -b
 - [x] Unificar as duas entradas num único CLI (`minicli.py`)
 - [ ] Concluir a flag `-clean`, que hoje só pede confirmação
 - [ ] Validar variáveis de ambiente na inicialização
-- [ ] Tratar rotação/truncamento do arquivo de log
+- [x] Tratar truncamento do arquivo de log, reiniciando a leitura do zero
+- [ ] Tratar rotação, com o arquivo renomeado ou recriado

@@ -70,7 +70,7 @@ class MyEventHandler(FileSystemEventHandler):
 
 
 def popula_indice(evento):
-    if evento not in relacao_pos_file:
+    if evento not in relacao_pos_file or os.path.getsize(evento) < relacao_pos_file[evento]:
         relacao_pos_file[evento] = 0
         ler_arquivo(evento)
     else:
@@ -85,7 +85,7 @@ def ler_arquivo(evento):
             conteudo = file.read()
 
             ultima_quebra = conteudo.rfind(b"\n")
-            if ultima_quebra == -1:
+            if ultima_quebra == -1 and pos_inicial != 0:
                 # ainda nao ha nenhuma linha completa, espera o proximo evento
                 return
 
@@ -98,7 +98,7 @@ def ler_arquivo(evento):
             relacao_pos_file[evento] = pos_inicial + len(completo)
             servico_do_evento = os.path.basename(os.path.dirname(evento))
             json.dump(relacao_pos_file,open(path_arquivo_json,"w"))
-            pre_filtro(novas_linhas, regras, servico_do_evento)
+            #pre_filtro(novas_linhas, regras, servico_do_evento)
                               
     except Exception:
         log_from_logging.exception("falha no pre_filtro, servico=%s", servico_do_evento)
@@ -130,11 +130,16 @@ def envio_para_API(log, servico):
     try:
         response = requests.post(url, json=data, headers=headers)
         if response.status_code == 200:
-            print(f"Log enviado para centralizador, Status code:{response.status_code}")
+            print(f"Log enviado para centralizador, Status code: {response.status_code}")
         else:
             print(f"Falha ao enviar log_from_logging Status code: {response.status_code}")
     except Exception as e:
         log_from_logging.exception("Erro ao enviar log: ", e)
+
+def read_from_last(evento):
+    if os.path.getsize(evento) < relacao_pos_file[evento]:
+        relacao_pos_file[evento] = os.path.getsize(evento)
+        ler_arquivo(evento)
 
 if __name__ == "__main__":
     cria_observer()
