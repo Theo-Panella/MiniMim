@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cli"
+version = "0.1.0"
+dependencies = [
+    "python-dotenv",
+    "requests",
+    "PyYAML",
+    "watchdog",
+]
+
+[project.scripts]
+minicli = "minicli:main"
+
+[tool.setuptools]
+py-modules = ["minicli", "minimim_refactor", "MiniMim"]

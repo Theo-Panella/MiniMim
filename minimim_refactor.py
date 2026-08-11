@@ -103,7 +103,7 @@ def ler_arquivo(evento):
             #print(relacao_pos_file)
                               
     except Exception:
-        log.exception("falha no pre_filtro, servico=%s", servico_do_evento)
+        log_from_logging.exception("falha no pre_filtro, servico=%s", servico_do_evento)
 
 def pre_filtro(ultimas_linhas, regras, servico_do_evento):
     """Classifica cada linha nova lida do log; o primeiro match (mais especifico) vence."""
@@ -115,12 +115,13 @@ def pre_filtro(ultimas_linhas, regras, servico_do_evento):
             linha = cada_linha.strip()
             for regra in regras_do_servico:
                 if regra["padrao"].search(linha):
-                    envio_para_API(linha,servico_do_evento)
+                    #envio_para_API(linha,servico_do_evento)
+                    print(f"Achei uma {regra["padrao"]}")
                     break
                 else:
                     pass
     except Exception:
-        log.exception("falha no pre_filtro, servico=%s", servico_do_evento)
+        log_from_logging.exception("falha no pre_filtro, servico=%s", servico_do_evento)
 
 def envio_para_API(log, servico):
     """Envia o log classificado para o centralizador."""
@@ -133,9 +134,9 @@ def envio_para_API(log, servico):
         if response.status_code == 200:
             print(f"Log enviado para centralizador, Status code:{response.status_code}")
         else:
-            print(f"Falha ao enviar log. Status code: {response.status_code}")
+            print(f"Falha ao enviar log_from_logging Status code: {response.status_code}")
     except Exception as e:
-        log.exception("Erro ao enviar log: ", e)
+        log_from_logging.exception("Erro ao enviar log: ", e)
 
 if __name__ == "__main__":
     cria_observer()

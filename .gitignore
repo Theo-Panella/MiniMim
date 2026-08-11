@@ -3,3 +3,4 @@
 .env
 __*
 ConfigurationFiles/relacao_pos_file.json
+cli.egg-info/

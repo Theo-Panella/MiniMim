@@ -4,6 +4,7 @@ import os
 import re
 
 import yaml
+from minimim_refactor import cria_observer
 from dotenv import load_dotenv, set_key
 
 CAMINHO_ENV = ".env"
@@ -144,6 +145,11 @@ def coleta_regras(servico, regras_existentes):
     return regras
 
 
+def clean(Path,log_path,caminho_configuracao):
+    """Limpa o estado de leitura salvo"""
+    confirma = input(str(f"O estado de leitura .json será limpo, confirmar? [S/n] "))
+    print(confirma)
+
 def executa_tutorial():
     """Passo a passo interativo que monta o .env e o filter.yaml."""
     titulo("MiniMim - Configuracao inicial")
@@ -238,6 +244,8 @@ def main():
 
     parser.add_argument('-t','--tutorial', action='store_true', help="Interactive step-by-step setup of the .env and filter.yaml files")
     parser.add_argument('--start', action='store_true', help="Start MiniMim using the pre done configuration")
+    parser.add_argument('-b','--observe', action='store_true', help="Start observation with the done files")
+    parser.add_argument('-clean', help="Clean the path that is ")
 
     args = parser.parse_args()
 
@@ -260,6 +268,15 @@ def main():
         for workdir in log_path:
             for arquivo in os.scandir(workdir):
                 popula_indice(os.path.join(workdir, arquivo.name))
+                cria_observer()
+    if args.observe:
+        cria_observer()
+
+    if args.clean:
+        try:
+            clean(args.clean,log_path,caminho_de_configuracao)
+        except (KeyboardInterrupt, EOFError):
+            print("Encerrando Limpeza")
     else:
         parser.print_help()
 
