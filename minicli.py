@@ -246,7 +246,6 @@ def main():
     parser.add_argument('-s','--start', action='store_true', help="First load, make the first log colection")
     parser.add_argument('-rfl', action='store_true', help="(Read From Last) do the load, using the last line as base reading")
     parser.add_argument('-b','--observe', action='store_true', help="Start observation")
-    parser.add_argument('-clean', help="Clean the path that is ")
 
     args = parser.parse_args()
 
@@ -281,12 +280,6 @@ def main():
 
     if args.observe:
         cria_observer()
-
-    if args.clean:
-        try:
-            clean(args.clean,log_path,caminho_de_configuracao)
-        except (KeyboardInterrupt, EOFError):
-            print("Encerrando Limpeza")
 
     if args.rfl:
         if not log_path:

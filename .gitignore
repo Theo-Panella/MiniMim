@@ -2,5 +2,7 @@
 *.conf
 .env
 __*
-ConfigurationFiles/relacao_pos_file.json
+Configuration_Files/relacao_pos_file.json
 cli.egg-info/
+*.log
+gunicorn.ctl
