@@ -14,7 +14,8 @@ A ideia é fazer a triagem **na ponta**: em vez de mandar o log inteiro pra um s
 MiniMim-Agent/
 ├── minicli.py                 # CLI: tutorial, carga inicial e observação
 ├── MiniMim.py                 # agente principal: watchdog + pré-filtro
-├── ConfigurationFiles/
+├── api.py                     # centralizador de logs (Flask), recebe os POSTs do agente
+├── Configuration_Files/
 │   ├── filter.yaml            # regras de filtragem, uma seção por serviço
 │   └── relacao_pos_file.json  # índice de leitura por arquivo (não versionado)
 ├── Apache/, Openssh/          # pastas de log de amostra, uma por serviço
@@ -34,8 +35,7 @@ O nome de cada pasta de log precisa bater com a seção correspondente no `filte
 1. Na inicialização, o `.env` é carregado, o `filter.yaml` é lido e o índice de posições em `JSON_PATH` é restaurado; as regras de cada serviço são compiladas e ordenadas por `especificidade` (maior primeiro).
 2. O [watchdog](https://pypi.org/project/watchdog/) observa cada diretório listado em `LOG_PATH`. A cada modificação, o agente lê só as linhas novas de cada arquivo e regrava a posição do último `seek` no arquivo de índice, então a leitura continua de onde parou entre execuções.
 3. Cada linha nova é comparada com as regras do serviço deduzido do nome da pasta; o primeiro match — o mais específico — vence.
-
-> **Status:** a chamada do `pre_filtro` está comentada no `ler_arquivo` — a leitura incremental roda e grava o índice, mas nada é classificado nem enviado no momento. Quando ativa, cada linha que casa vai para `envio_para_API()`, via POST para um endpoint local fixo (`http://127.0.0.1:8000`).
+4. Cada linha que casa vai para `envio_para_API()`, num POST para o endpoint local fixo `http://127.0.0.1:8000`, onde o `api.py` recebe e registra.
 
 ---
 
@@ -50,8 +50,8 @@ Configure o `.env`:
 
 ```dotenv
 LOG_PATH = /caminho/para/Apache/,/caminho/para/Openssh/
-CONFIGURATION_FILE = ConfigurationFiles/filter.yaml
-JSON_PATH = ConfigurationFiles/relacao_pos_file.json
+CONFIGURATION_FILE = Configuration_Files/filter.yaml
+JSON_PATH = Configuration_Files/relacao_pos_file.json
 ```
 
 `LOG_PATH` é uma lista de diretórios (um por serviço); `CONFIGURATION_FILE` aponta pro `filter.yaml`; `JSON_PATH` é onde o índice de leitura é gravado.
@@ -82,6 +82,13 @@ python minicli.py -b
 
 `escreve_log_teste.py` gera linhas de teste continuamente em `Openssh/OpenSSH_2k.log`, útil pra ver o watchdog reagir. Encerre qualquer processo com `Ctrl+C`.
 
+A API que recebe os logs precisa estar de pé antes da coleta. O `gunicorn` só roda em Linux — ele importa `fcntl` —, então no Windows use o `waitress`:
+
+```bash
+waitress-serve --host=127.0.0.1 --port=8000 api:app   # Windows
+gunicorn --bind 127.0.0.1:8000 api:app                # Linux
+```
+
 ---
 
 ## Roadmap
@@ -89,7 +96,7 @@ python minicli.py -b
 - [x] Envio da linha classificada para uma API central
 - [ ] Tornar o endpoint da API configurável pelo `.env`
 - [x] Unificar as duas entradas num único CLI (`minicli.py`)
-- [ ] Concluir a flag `-clean`, que hoje só pede confirmação
+- [ ] Concluir o `clean()`, que hoje só pede confirmação e não está ligado a nenhuma flag do CLI
 - [ ] Validar variáveis de ambiente na inicialização
 - [x] Tratar truncamento do arquivo de log, reiniciando a leitura do zero
 - [ ] Tratar rotação, com o arquivo renomeado ou recriado
