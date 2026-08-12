@@ -4,12 +4,11 @@ import os
 import re
 
 import yaml
-from MiniMim import cria_observer, read_from_last
 from dotenv import load_dotenv, set_key
 from rich.progress import Progress, MofNCompleteColumn, TextColumn, BarColumn
 
 CAMINHO_ENV = ".env"
-CONFIGURACAO_PADRAO = os.path.join("ConfigurationFiles", "filter.yaml")
+CONFIGURACAO_PADRAO = os.path.join("Configuration_Files", "filter.yaml")
 
 
 # --------------------------------------------------------------------------- #
@@ -145,12 +144,6 @@ def coleta_regras(servico, regras_existentes):
 
     return regras
 
-
-def clean(Path,log_path,caminho_configuracao):
-    """Limpa o estado de leitura salvo"""
-    confirma = input(str(f"O estado de leitura .json será limpo, confirmar? [S/n] "))
-    print(confirma)
-
 def executa_tutorial():
     """Passo a passo interativo que monta o .env e o filter.yaml."""
     titulo("MiniMim - Configuracao inicial")
@@ -229,6 +222,7 @@ def executa_tutorial():
         open(CAMINHO_ENV, 'w', encoding='utf-8').close()
     set_key(CAMINHO_ENV, "LOG_PATH", ",".join(diretorios))
     set_key(CAMINHO_ENV, "CONFIGURATION_FILE", caminho_de_configuracao)
+    set_key(CAMINHO_ENV, "JSON_PATH", "Configuration_Files/filestate.json")
     print(f"  + {os.path.abspath(CAMINHO_ENV)} atualizado.")
 
     print("\nPronto. Proximos passos:")
@@ -245,7 +239,6 @@ def main():
 
     parser.add_argument('-t','--tutorial', action='store_true', help="Interactive step-by-step setup of configuration files")
     parser.add_argument('-s','--start', action='store_true', help="First load, make the first log colection")
-    parser.add_argument('-rfl', action='store_true', help="(Read From Last) do the load, using the last line as base reading")
     parser.add_argument('-b','--observe', action='store_true', help="Start observation")
 
     args = parser.parse_args()
@@ -258,12 +251,14 @@ def main():
         return
 
     log_path = [p for p in (os.getenv('LOG_PATH') or '').split(',') if p.strip()]
+    
     path_arquivo_json = os.getenv('JSON_PATH')
+    
     caminho_de_configuracao = os.getenv('CONFIGURATION_FILE')
 
     if args.start:
-        if not log_path:
-            print("LOG_PATH nao configurado, rode: python minicli.py --tutorial")
+        if not log_path or not path_arquivo_json or not caminho_de_configuracao:
+            print("Nao configurado, rode: python minicli.py --tutorial")
             return
         # Import tardio: MiniMim le o .env no import e exige config valida.
         print("Iniciando Coleta de Logs")
@@ -286,16 +281,11 @@ def main():
         return
 
     if args.observe:
-        cria_observer()
-
-    if args.rfl:
-        if not log_path:
-            print("LOG_PATH nao configurado, rode: python minicli.py --tutorial")
-            return
-        for workdir in log_path:
-            for arquivo in os.scandir(workdir):
-                print(f"Populando json do path {workdir}")
-                read_from_last(os.path.join(workdir, arquivo.name))
+        if not log_path or not path_arquivo_json or not caminho_de_configuracao:
+            print("Nao configurado, rode: python minicli.py --tutorial")
+        else:
+            from MiniMim import cria_observer
+            cria_observer()
     else:
         parser.print_help()
 

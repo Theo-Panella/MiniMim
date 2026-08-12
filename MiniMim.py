@@ -134,10 +134,5 @@ def envio_para_API(log, servico):
     except requests.exceptions.RequestException:
         log_from_logging.exception("Erro ao enviar log para o centralizador")
 
-def read_from_last(evento):
-    if os.path.getsize(evento) < relacao_pos_file[evento]:
-        relacao_pos_file[evento] = os.path.getsize(evento)
-        ler_arquivo(evento)
-
 if __name__ == "__main__":
     cria_observer()
