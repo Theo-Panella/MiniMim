@@ -1,34 +1,42 @@
 from datetime import datetime, timezone
-from pathlib import Path
 
-from fastapi import FastAPI
-from pydantic import BaseModel
+from flask import Flask, jsonify, request
+from pydantic import BaseModel, ValidationError
 
 #====================================================================================
 # Modelo do corpo da requisicao.
 # O Minimim envia {"log": "<linha>"}; os demais campos sao opcionais.
 class LogRecebido(BaseModel):
     servico: str | None = None
-    log: str 
+    log: str
 #====================================================================================
 
 
-app = FastAPI(title="Centralizador de Logs", version="1.0.0")
+app = Flask(__name__)
 
 
 #====================================================================================
 # Recepcao dos logs
+# O Flask nao injeta o corpo pelo type hint: e preciso ler e validar na mao.
 @app.post("/")
-def receber_log(entrada: LogRecebido):
-    fila = ''
-    momento = datetime.now(timezone.utc).isoformat()
+def receber_log():
+    corpo = request.get_json(silent=True)
+    if not isinstance(corpo, dict):
+        return jsonify({"status": "erro", "detalhe": "corpo deve ser um objeto JSON"}), 400
 
-    origem = f"[{entrada.servico or '-'}/{fila}]"
-    linha = f"{momento} {origem}"
+    try:
+        entrada = LogRecebido.model_validate(corpo)
+    except ValidationError as erro:
+        detalhe = erro.errors(include_url=False, include_context=False)
+        return jsonify({"status": "erro", "detalhe": detalhe}), 400
+
+    momento = datetime.now(timezone.utc).isoformat()
+    origem = f"[{entrada.servico or '-'}]"
+    linha = f"{momento} {origem} {entrada.log}"
 
     print(f"Log recebido: {linha}")
 
-    return {"status": "ok", "recebido_em": momento}
+    return jsonify({"status": "ok", "recebido_em": momento})
 #====================================================================================
 
 
@@ -36,5 +44,10 @@ def receber_log(entrada: LogRecebido):
 # Healthcheck simples
 @app.get("/")
 def healthcheck():
-    return {"status": "online", "servico": "Centralizador de Logs"}
+    return jsonify({"status": "online", "servico": "Centralizador de Logs"})
 #====================================================================================
+
+
+if __name__ == "__main__":
+    # A porta 8000 e a que o MiniMim usa em envio_para_API.
+    app.run(host="127.0.0.1", port=8000, debug=True)
