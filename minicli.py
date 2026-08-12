@@ -6,6 +6,7 @@ import re
 import yaml
 from MiniMim import cria_observer, read_from_last
 from dotenv import load_dotenv, set_key
+from rich.progress import Progress, MofNCompleteColumn, TextColumn, BarColumn
 
 CAMINHO_ENV = ".env"
 CONFIGURACAO_PADRAO = os.path.join("ConfigurationFiles", "filter.yaml")
@@ -265,12 +266,18 @@ def main():
             print("LOG_PATH nao configurado, rode: python minicli.py --tutorial")
             return
         # Import tardio: MiniMim le o .env no import e exige config valida.
-        from MiniMim import popula_indice
+        print("Iniciando Coleta de Logs")
         print("=="*40)
+        from MiniMim import popula_indice
         for workdir in log_path:
-            for arquivo in os.scandir(workdir):
-                print(f"Populando json do path {workdir}")
-                popula_indice(os.path.join(workdir, arquivo.name))
+            with Progress(TextColumn(f"[progress.description]Processando arquivos de {workdir}..."),BarColumn(),MofNCompleteColumn()) as progress:
+                task = progress.add_task(f"[green]", total=sum(1 for arquivo_teste in os.scandir(workdir) if arquivo_teste.is_file()))
+                while not progress.finished:
+                    for arquivo in os.scandir(workdir):
+                        popula_indice(os.path.join(workdir, arquivo.name))
+                        progress.update(task, advance=1)
+            print(f"Diretorio {workdir} finalizado")
+            print("=="*40)
         
         print("Coleta inicial finalizada")
         print("=="*40)
