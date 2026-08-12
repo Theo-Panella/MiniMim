@@ -81,7 +81,6 @@ def ler_arquivo(evento):
         with open(evento, "rb") as file:
             pos_inicial = relacao_pos_file[evento]
             file.seek(pos_inicial)
-            #print(pos_inicial)
             conteudo = file.read()
 
             ultima_quebra = conteudo.rfind(b"\n")
@@ -106,7 +105,6 @@ def ler_arquivo(evento):
 def pre_filtro(ultimas_linhas, regras, servico_do_evento):
     """Classifica cada linha nova lida do log; o primeiro match (mais especifico) vence."""
     try:
-        print("Chegou no Pre filtro")
         regras_do_servico = regras.get(servico_do_evento)
         if regras_do_servico is None:
             return              
@@ -130,7 +128,7 @@ def envio_para_API(log, servico):
     try:
         response = requests.post(url, json=data, headers=headers, timeout=5)
         if response.status_code == 200:
-            print(f"Log enviado para centralizador, Status code: {response.status_code}")
+            return
         else:
             print(f"Falha ao enviar log_from_logging Status code: {response.status_code}")
     except requests.exceptions.RequestException:
