@@ -17,7 +17,7 @@ MiniMim-Agent/
 ├── api.py                     # centralizador de logs (Flask), recebe os POSTs do agente
 ├── Configuration_Files/
 │   ├── filter.yaml            # regras de filtragem, uma seção por serviço
-│   └── relacao_pos_file.json  # índice de leitura por arquivo (não versionado)
+│   └── filestate.json         # índice de leitura por arquivo, versionado vazio
 ├── Apache/, Openssh/          # pastas de log de amostra, uma por serviço
 ├── legacy/MiniMim.py          # primeira versão, mantida só de referência
 ├── escreve_log_teste.py       # gera linhas de log continuamente, pra teste
@@ -51,10 +51,10 @@ Configure o `.env`:
 ```dotenv
 LOG_PATH = /caminho/para/Apache/,/caminho/para/Openssh/
 CONFIGURATION_FILE = Configuration_Files/filter.yaml
-JSON_PATH = Configuration_Files/relacao_pos_file.json
+JSON_PATH = Configuration_Files/filestate.json
 ```
 
-`LOG_PATH` é uma lista de diretórios (um por serviço); `CONFIGURATION_FILE` aponta pro `filter.yaml`; `JSON_PATH` é onde o índice de leitura é gravado.
+`LOG_PATH` é uma lista de diretórios (um por serviço); `CONFIGURATION_FILE` aponta pro `filter.yaml`; `JSON_PATH` é onde o índice de leitura é gravado. O tutorial grava as três.
 
 O tutorial interativo monta o `.env` e o `filter.yaml` respondendo perguntas:
 
@@ -66,12 +66,6 @@ Carga inicial (lê o que já existe nos logs):
 
 ```bash
 python minicli.py -s
-```
-
-Recarga a partir do fim do arquivo, para os que já estão no índice:
-
-```bash
-python minicli.py -rfl
 ```
 
 Monitoramento contínuo:
@@ -96,7 +90,7 @@ gunicorn --bind 127.0.0.1:8000 api:app                # Linux
 - [x] Envio da linha classificada para uma API central
 - [ ] Tornar o endpoint da API configurável pelo `.env`
 - [x] Unificar as duas entradas num único CLI (`minicli.py`)
-- [ ] Concluir o `clean()`, que hoje só pede confirmação e não está ligado a nenhuma flag do CLI
+- [ ] Oferecer uma limpeza do índice de leitura pelo CLI
 - [ ] Validar variáveis de ambiente na inicialização
 - [x] Tratar truncamento do arquivo de log, reiniciando a leitura do zero
 - [ ] Tratar rotação, com o arquivo renomeado ou recriado
