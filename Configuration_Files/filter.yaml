@@ -3,26 +3,25 @@
 # A pré filtragem deve ser sempre do mais especifico para o mais genérico
 
 Apache:
-    teste-1:
-        padrao: '^\[.*\] \[error\] \[client .*\] Directory index forbidden by rule: .'
-        especificidade: 3
-    teste-2:
-        padrao: '^\[.*\] \[notice\] workerEnv.init().'
-        especificidade: 3
-
+  teste-1:
+    padrao: '^\[.*\] \[error\] \[client .*\] Directory index forbidden by rule: .'
+    especificidade: 3
+  teste-2:
+    padrao: ^\[.*\] \[notice\] workerEnv.init().
+    especificidade: 3
 Openssh:
-    BreakInAttempt:
-        padrao: 'POSSIBLE BREAK-IN ATTEMPT'
-        especificidade: 5
-    FailedInvalidUser:
-        padrao: 'sshd\[\d+\]: Failed password for invalid user \S+ from '
-        especificidade: 4
-    FailedPassword:
-        padrao: 'sshd\[\d+\]: Failed password for \S+ from '
-        especificidade: 3
-    InvalidUser:
-        padrao: 'sshd\[\d+\]: Invalid user \S+ from '
-        especificidade: 2
-    Accepted:
-        padrao: 'sshd\[\d+\]: Accepted password for \S+ from '
-        especificidade: 1
+  BreakInAttempt:
+    padrao: POSSIBLE BREAK-IN ATTEMPT
+    especificidade: 5
+  FailedInvalidUser:
+    padrao: 'sshd\[\d+\]: Failed password for invalid user \S+ from '
+    especificidade: 4
+  FailedPassword:
+    padrao: 'sshd\[\d+\]: Failed password for \S+ from '
+    especificidade: 3
+  InvalidUser:
+    padrao: 'sshd\[\d+\]: Invalid user \S+ from '
+    especificidade: 2
+  Accepted:
+    padrao: 'sshd\[\d+\]: Accepted password for \S+ from '
+    especificidade: 1
