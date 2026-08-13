@@ -7,6 +7,7 @@ import yaml
 from dotenv import load_dotenv, set_key
 from rich.progress import Progress, MofNCompleteColumn, TextColumn, BarColumn
 
+load_dotenv()
 CAMINHO_ENV = ".env"
 CONFIGURACAO_PADRAO = os.path.join("Configuration_Files", "filter.yaml")
 
@@ -258,7 +259,6 @@ def main():
 
     if args.start:
         if not log_path or not path_arquivo_json or not caminho_de_configuracao:
-            print("Nao configurado, rode: python minicli.py --tutorial")
             return
         # Import tardio: MiniMim le o .env no import e exige config valida.
         print("Iniciando Coleta de Logs")
