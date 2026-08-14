@@ -94,11 +94,6 @@ def salva_configuracao(caminho, regras, cabecalho=""):
                        sort_keys=False, default_flow_style=False)
 
 
-def normaliza_diretorio(caminho):
-    """Caminho absoluto terminando em separador: o agente concatena o nome do arquivo."""
-    absoluto = os.path.abspath(os.path.expanduser(caminho))
-    return absoluto + os.sep
-
 
 # --------------------------------------------------------------------------- #
 # Tutorial
@@ -183,7 +178,7 @@ def executa_tutorial():
             print("  ! Informe pelo menos um diretorio.")
             continue
 
-        diretorio = normaliza_diretorio(entrada)
+        diretorio = entrada
 
         if not os.path.isdir(diretorio):
             if confirma(f"  '{diretorio}' nao existe. Criar?", padrao=True):
@@ -227,8 +222,8 @@ def executa_tutorial():
     print(f"  + {os.path.abspath(CAMINHO_ENV)} atualizado.")
 
     print("\nPronto. Proximos passos:")
-    print("  python minicli.py -start     # carga inicial dos logs existentes")
-    print("  python MiniMim.py   # monitoramento continuo")
+    print("  minicli --load  # carga inicial dos logs existentes")
+    print("  minicli --observe   # monitoramento continuo")
 
 
 # --------------------------------------------------------------------------- #
@@ -236,11 +231,11 @@ def executa_tutorial():
 # --------------------------------------------------------------------------- #
 
 def main():
-    parser = argparse.ArgumentParser(prog='MiniMim', description='The best CLI agent in my neighborhood')
+    parser = argparse.ArgumentParser(prog='MiniMim', description='The best CLI agent in the creator neighborhood')
 
     parser.add_argument('-t','--tutorial', action='store_true', help="Interactive step-by-step setup of configuration files")
-    parser.add_argument('-s','--start', action='store_true', help="First load, make the first log colection")
-    parser.add_argument('-b','--observe', action='store_true', help="Start observation")
+    parser.add_argument('-l','--load', action='store_true', help="First load, make the first log collection")
+    parser.add_argument('-o','--observe', action='store_true', help="Begins observation")
 
     args = parser.parse_args()
 
@@ -257,7 +252,7 @@ def main():
     
     caminho_de_configuracao = os.getenv('CONFIGURATION_FILE')
 
-    if args.start:
+    if args.load:
         if not log_path or not path_arquivo_json or not caminho_de_configuracao:
             return
         # Import tardio: MiniMim le o .env no import e exige config valida.
@@ -276,7 +271,7 @@ def main():
         
         print("Coleta inicial finalizada")
         print("=="*40)
-        print("Inicie a observação a partir de agora com [minicli -b] ou [minicli --observe]")
+        print("Inicie a observação a partir de agora com [minicli -o] ou [minicli --observe]")
 	
         return
 
