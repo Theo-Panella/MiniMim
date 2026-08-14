@@ -1,0 +1,39 @@
+name: "CodeQL Analyses"
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - main
+    
+jobs:
+  Analyze:
+    name: Analyze Python Code
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write 
+    
+    steps:
+      - name: Code Check
+        uses: actions/checkout@v4
+
+      - name: Python setup
+        uses: actions/setup-python@v5
+        with:
+          version: latest
+      
+      - name: Initialize CodeQL for python
+        uses: github/codeql-action/init@v4
+        with:
+          languages: 'python'
+          queries: 'security-and-quality' 
+      
+      - name: Start CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:python"
