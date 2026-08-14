@@ -96,7 +96,7 @@ def ler_arquivo(evento):
             # entao relemos so o trecho completo para obter uma posicao valida.
             relacao_pos_file[evento] = pos_inicial + len(completo)
             servico_do_evento = os.path.basename(os.path.dirname(evento))
-            json.dump(relacao_pos_file,open(path_arquivo_json,"w"))
+            json.dump(relacao_pos_file,open(path_arquivo_json,"w")).close()
             pre_filtro(novas_linhas, regras, servico_do_evento)
                               
     except Exception:
