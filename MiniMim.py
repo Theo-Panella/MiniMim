@@ -89,7 +89,7 @@ def ler_arquivo(evento):
                 return
 
             completo = conteudo[:ultima_quebra + 1]
-            novas_linhas = completo.decode("utf-8").splitlines()
+            novas_linhas = completo.decode("utf-8",errors="replace").splitlines()
             
             # Reposiciona exatamente no fim da ultima linha completa.
             # seek() em modo texto so aceita posicoes vindas de tell(),
@@ -100,7 +100,7 @@ def ler_arquivo(evento):
             pre_filtro(novas_linhas, regras, servico_do_evento)
                               
     except Exception:
-        log_from_logging.exception("falha no pre_filtro, servico=%s", servico_do_evento)
+        log_from_logging.exception("falha no pre_filtro, servico=%s", os.path.basename(os.path.dirname(evento)))
 
 def pre_filtro(ultimas_linhas, regras, servico_do_evento):
     """Classifica cada linha nova lida do log; o primeiro match (mais especifico) vence."""
