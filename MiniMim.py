@@ -14,6 +14,7 @@ caminho_de_configuracao = os.getenv('CONFIGURATION_FILE')
 log_path = os.getenv('LOG_PATH').split(',')
 path_arquivo_json = os.getenv('JSON_PATH')
 log_from_logging = logging.getLogger(__name__)
+url = os.getenv('API_URL')
 
 # Abre o arquivo de configuracao e compila os padroes para melhor desempenho.
 # Tem mais processamento na primeira rodagem por compilar todas as regras de uma vez.
@@ -123,7 +124,6 @@ def pre_filtro(ultimas_linhas, regras, servico_do_evento):
 
 def envio_para_API(log, servico, regra):
     """Envia o log classificado para o centralizador."""
-    url = "http://127.0.0.1:8000"  # Substitua pelo endpoint da sua API
     headers = {"Content-Type": "application/json"}
     data = {"servico": servico, "log": log, "regra": regra}
 

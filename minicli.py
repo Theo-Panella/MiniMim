@@ -2,6 +2,7 @@
 import argparse
 import os
 import re
+import json
 
 import yaml
 from dotenv import load_dotenv, set_key
@@ -219,6 +220,7 @@ def executa_tutorial():
     set_key(CAMINHO_ENV, "LOG_PATH", ",".join(diretorios))
     set_key(CAMINHO_ENV, "CONFIGURATION_FILE", caminho_de_configuracao)
     set_key(CAMINHO_ENV, "JSON_PATH", "Configuration_Files/filestate.json")
+    set_key(CAMINHO_ENV, "API_URL", "http://127.0.0.1:8000")
     print(f"  + {os.path.abspath(CAMINHO_ENV)} atualizado.")
 
     print("\nPronto. Proximos passos:")
@@ -249,8 +251,15 @@ def main():
     parser.add_argument('-t','--tutorial', action='store_true', help="Configuracao interativa passo a passo dos arquivos de configuracao")
     parser.add_argument('-l','--load', action='store_true', help="Faz a carga inicial dos arquivos nos diretorios definidos no .env")
     parser.add_argument('-o','--observe', action='store_true', help="Inicia a observacao continua dos diretorios de log")
+    parser.add_argument('-c','--clean', action='store_true', help="Limpa o arquivo do ponteiro de leitura")
 
     args = parser.parse_args()
+
+    log_path = [p for p in (os.getenv('LOG_PATH') or '').split(',') if p.strip()]
+    
+    path_arquivo_json = os.getenv('JSON_PATH')
+    
+    caminho_de_configuracao = os.getenv('CONFIGURATION_FILE')
 
     if args.tutorial:
         try:
@@ -258,12 +267,6 @@ def main():
         except (KeyboardInterrupt, EOFError):
             print("\nTutorial cancelado.")
         return
-
-    log_path = [p for p in (os.getenv('LOG_PATH') or '').split(',') if p.strip()]
-    
-    path_arquivo_json = os.getenv('JSON_PATH')
-    
-    caminho_de_configuracao = os.getenv('CONFIGURATION_FILE')
 
     if args.load:
         if not log_path or not path_arquivo_json or not caminho_de_configuracao:
@@ -294,9 +297,21 @@ def main():
         else:
             from MiniMim import cria_observer
             cria_observer()
+
+    if args.clean:
+        if path_arquivo_json:
+            json_aberto = open(path_arquivo_json,"w")
+            json.dump({},json_aberto)
+            json_aberto.close()
+            print("="*23)
+            print("= Arquivo .json limpo =")
+            print("="*23)
+        else:
+            print("Arquivo .json não localizado")
+            return
+
     else:
         parser.print_help()
-
 
 if __name__ == "__main__":
     load_dotenv()
