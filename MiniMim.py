@@ -96,10 +96,10 @@ def ler_arquivo(evento):
             # entao relemos so o trecho completo para obter uma posicao valida.
             relacao_pos_file[evento] = pos_inicial + len(completo)
             servico_do_evento = os.path.basename(os.path.dirname(evento))
+            pre_filtro(novas_linhas, regras, servico_do_evento)
             json_aberto = open(path_arquivo_json,"w")
             json.dump(relacao_pos_file,json_aberto)
             json_aberto.close()
-            pre_filtro(novas_linhas, regras, servico_do_evento)
                               
     except Exception:
         log_from_logging.exception("falha no pre_filtro, servico=%s", os.path.basename(os.path.dirname(evento)))
@@ -114,18 +114,18 @@ def pre_filtro(ultimas_linhas, regras, servico_do_evento):
             linha = cada_linha.strip()
             for regra in regras_do_servico:
                 if regra["padrao"].search(linha):
-                    envio_para_API(linha,servico_do_evento)
+                    envio_para_API(linha,servico_do_evento,regra["id"])
                     break
                 else:
                     pass
     except Exception:
         log_from_logging.exception("falha no pre_filtro, servico=%s", servico_do_evento)
 
-def envio_para_API(log, servico):
+def envio_para_API(log, servico, regra):
     """Envia o log classificado para o centralizador."""
     url = "http://127.0.0.1:8000"  # Substitua pelo endpoint da sua API
     headers = {"Content-Type": "application/json"}
-    data = {"servico": servico, "log": log}
+    data = {"servico": servico, "log": log, "regra": regra}
 
     try:
         response = requests.post(url, json=data, headers=headers, timeout=5)
