@@ -6,3 +6,4 @@ Configuration_Files/relacao_pos_file.json
 cli.egg-info/
 *.log
 gunicorn.ctl
+Configuration_Files/filestate.json
