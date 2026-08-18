@@ -234,7 +234,7 @@ def main():
     parser = argparse.ArgumentParser(prog='MiniMim', description='The best CLI agent in the creator neighborhood')
 
     parser.add_argument('-t','--tutorial', action='store_true', help="Interactive step-by-step setup of configuration files")
-    parser.add_argument('-l','--load', action='store_true', help="First load, make the first log collection")
+    parser.add_argument('-l','--load', action='store_true', help="Load the files in the specific directories in .env")
     parser.add_argument('-o','--observe', action='store_true', help="Begins observation")
 
     args = parser.parse_args()

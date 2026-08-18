@@ -9,6 +9,7 @@ from pydantic import BaseModel, ValidationError
 class LogRecebido(BaseModel):
     servico: str | None = None
     log: str
+    regra: str
 #====================================================================================
 
 
@@ -32,7 +33,7 @@ def receber_log():
 
     momento = datetime.now(timezone.utc).isoformat()
     origem = f"[{entrada.servico or '-'}]"
-    linha = f"{momento} {origem} {entrada.log}"
+    linha = f"{momento} {origem} {entrada.servico} {entrada.regra}"
 
     print(f"Log recebido: {linha}")
 
