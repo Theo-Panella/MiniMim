@@ -219,7 +219,13 @@ def executa_tutorial():
         open(CAMINHO_ENV, 'w', encoding='utf-8').close()
     set_key(CAMINHO_ENV, "LOG_PATH", ",".join(diretorios))
     set_key(CAMINHO_ENV, "CONFIGURATION_FILE", caminho_de_configuracao)
-    set_key(CAMINHO_ENV, "JSON_PATH", "Configuration_Files/filestate.json")
+    caminho_json = "Configuration_Files/filestate.json"
+    if not os.path.exists(caminho_json):
+        os.makedirs(os.path.dirname(caminho_json), exist_ok=True)
+        with open(caminho_json, 'w', encoding='utf-8') as arquivo_json:
+            json.dump({}, arquivo_json)
+        print(f"  + {caminho_json} criado.")
+    set_key(CAMINHO_ENV, "JSON_PATH", caminho_json)
     set_key(CAMINHO_ENV, "API_URL", "http://127.0.0.1:8000")
     print(f"  + {os.path.abspath(CAMINHO_ENV)} atualizado.")
 

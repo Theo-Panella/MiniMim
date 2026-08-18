@@ -21,8 +21,12 @@ url = os.getenv('API_URL')
 with open(caminho_de_configuracao, 'r') as arquivo_de_configuracao_puro:
     configuracao = yaml.safe_load(arquivo_de_configuracao_puro)
 
-with open(path_arquivo_json, 'r') as arquivo_json:
-    relacao_pos_file = json.load(arquivo_json)
+# O indice de leitura e estado local: pode nao existir na primeira execucao.
+if os.path.exists(path_arquivo_json):
+    with open(path_arquivo_json, 'r') as arquivo_json:
+        relacao_pos_file = json.load(arquivo_json)
+else:
+    relacao_pos_file = {}
 
 regras = {
     servico: sorted(
