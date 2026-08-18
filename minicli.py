@@ -230,12 +230,25 @@ def executa_tutorial():
 # CLI
 # --------------------------------------------------------------------------- #
 
-def main():
-    parser = argparse.ArgumentParser(prog='MiniMim', description='The best CLI agent in the creator neighborhood')
+class AjudaEmPortugues(argparse.HelpFormatter):
+    """Troca o prefixo 'usage:' do argparse por 'uso:'."""
 
-    parser.add_argument('-t','--tutorial', action='store_true', help="Interactive step-by-step setup of configuration files")
-    parser.add_argument('-l','--load', action='store_true', help="Load the files in the specific directories in .env")
-    parser.add_argument('-o','--observe', action='store_true', help="Begins observation")
+    def add_usage(self, usage, actions, groups, prefix=None):
+        super().add_usage(usage, actions, groups, prefix or "uso: ")
+
+
+def main():
+    parser = argparse.ArgumentParser(prog='MiniMim',
+                                     description='O melhor agente CLI do bairro do criador',
+                                     formatter_class=AjudaEmPortugues,
+                                     add_help=False)
+    # Titulo da secao de argumentos, que o argparse escreve em ingles por padrao.
+    parser._optionals.title = "opcoes"
+
+    parser.add_argument('-h','--help', action='help', help="Mostra esta mensagem de ajuda e sai")
+    parser.add_argument('-t','--tutorial', action='store_true', help="Configuracao interativa passo a passo dos arquivos de configuracao")
+    parser.add_argument('-l','--load', action='store_true', help="Faz a carga inicial dos arquivos nos diretorios definidos no .env")
+    parser.add_argument('-o','--observe', action='store_true', help="Inicia a observacao continua dos diretorios de log")
 
     args = parser.parse_args()
 
