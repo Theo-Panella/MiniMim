@@ -15,7 +15,7 @@ log_path = os.getenv('LOG_PATH').split(',')
 path_arquivo_json = os.getenv('JSON_PATH')
 log_from_logging = logging.getLogger(__name__)
 url = os.getenv('API_URL')
-
+qtd = 0
 
 # Abre o arquivo de configuracao e compila os padroes para melhor desempenho.
 # Tem mais processamento na primeira rodagem por compilar todas as regras de uma vez.
@@ -113,37 +113,40 @@ def ler_arquivo(evento):
 def pre_filtro(ultimas_linhas, regras, servico_do_evento):
     """Classifica cada linha nova lida do log; o primeiro match (mais especifico) vence."""
     try:
-        qtd = 0
-        batch_de_logs = {qtd: list}
-        lista_de_lista = [[]]
+        soma = qtd
+        batch_de_logs = {soma: list}
         regras_do_servico = regras.get(servico_do_evento)
         if regras_do_servico is None:
             return              
 
-        for cada_linha in ultimas_linhas:
-            linha = cada_linha.strip()
+        if len(ultimas_linhas) == 1:
             for regra in regras_do_servico:
-                    if regra["padrao"].search(linha):
-                        lista_de_lista.append([linha, servico_do_evento, regra["id"]])
-                        batch_de_logs.update({qtd: [linha, servico_do_evento, regra["id"]]})
-                        qtd+=1
-                        #print(batch_de_logs.values())
-                        #batch_de_logs[qtd].append(linha,servico_do_evento,regra["id"])
-                        
-                        if qtd == 100:
-                            #print(batch_de_logs)
-                            #lista_de_lista.clear()
-                            envio_para_API(batch_de_logs)
-                            batch_de_logs.clear()
-                            qtd = 0
+                if regra["padrao"].search(ultimas_linhas[0]):
+                    batch_de_logs.update({soma: [ultimas_linhas[0], servico_do_evento, regra["id"]]})
+                    soma+=1
+                    print(batch_de_logs)
+                else:
+                    pass 
+
+        if len(ultimas_linhas) > 1:         
+            for cada_linha in ultimas_linhas:
+                linha = cada_linha.strip()
+                for regra in regras_do_servico:
+                        if regra["padrao"].search(linha):
+                            batch_de_logs.update({soma: [linha, servico_do_evento, regra["id"]]})
+                            soma+=1
+                            if soma >= 100:
+                                envio_para_API(batch_de_logs)
+                                batch_de_logs.clear()
+                                soma = 0
+                                break
                             break
-                        break
-                    else:
-                        pass
-        if qtd:
-            envio_para_API(batch_de_logs)
+                        else:
+                            pass
+
     except Exception:
         log_from_logging.exception("falha no pre_filtro, servico=%s", servico_do_evento)
+
 
 def envio_para_API(batch_de_logs):
     """Envia o log classificado para o centralizador."""
