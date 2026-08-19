@@ -7,9 +7,7 @@ from pydantic import BaseModel, ValidationError
 # Modelo do corpo da requisicao.
 # O Minimim envia {"log": "<linha>"}; os demais campos sao opcionais.
 class LogRecebido(BaseModel):
-    servico: str | None = None
-    log: str
-    regra: str
+    batch: dict
 #====================================================================================
 
 
@@ -21,7 +19,7 @@ app = Flask(__name__)
 # O Flask nao injeta o corpo pelo type hint: e preciso ler e validar na mao.
 @app.post("/")
 def receber_log():
-    corpo = request.get_json(silent=True)
+    corpo = request.get_json(silent=False)
     if not isinstance(corpo, dict):
         return jsonify({"status": "erro", "detalhe": "corpo deve ser um objeto JSON"}), 400
 
@@ -32,8 +30,7 @@ def receber_log():
         return jsonify({"status": "erro", "detalhe": detalhe}), 400
 
     momento = datetime.now(timezone.utc).isoformat()
-    origem = f"[{entrada.servico or '-'}]"
-    linha = f"{momento} {origem} {entrada.servico} {entrada.regra}"
+    linha = f"{momento} {entrada}"
 
     print(f"Log recebido: {linha}")
 

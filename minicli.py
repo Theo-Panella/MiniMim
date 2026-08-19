@@ -5,8 +5,9 @@ import re
 import json
 
 import yaml
+import time
 from dotenv import load_dotenv, set_key
-from rich.progress import Progress, MofNCompleteColumn, TextColumn, BarColumn
+from rich.progress import Progress, MofNCompleteColumn, TextColumn, BarColumn, TimeRemainingColumn
 
 load_dotenv()
 CAMINHO_ENV = ".env"
@@ -275,23 +276,26 @@ def main():
         return
 
     if args.load:
+        start = time.perf_counter()
         if not log_path or not path_arquivo_json or not caminho_de_configuracao:
             return
-        # Import tardio: MiniMim le o .env no import e exige config valida.
         print("Iniciando Coleta de Logs")
         print("=="*40)
+
+        # Import tardio: MiniMim le o .env no import e exige config valida.
         from MiniMim import popula_indice
         for workdir in log_path:
-            with Progress(TextColumn(f"[progress.description]Processando arquivos de {workdir}..."),BarColumn(),MofNCompleteColumn()) as progress:
+            with Progress(TextColumn(f"[progress.description]Processando arquivos de {workdir}..."),BarColumn(),MofNCompleteColumn(),TimeRemainingColumn()) as progress:
                 task = progress.add_task(f"[green]", total=sum(1 for arquivo_teste in os.scandir(workdir) if arquivo_teste.is_file()))
-                while not progress.finished:
-                    for arquivo in os.scandir(workdir):
-                        popula_indice(os.path.join(workdir, arquivo.name))
-                        progress.update(task, advance=1)
+                for arquivo in os.scandir(workdir):
+                    popula_indice(os.path.join(workdir, arquivo.name))
+                    progress.update(task, advance=1)
             print(f"Diretorio {workdir} finalizado")
             print("=="*40)
-        
-        print("Coleta inicial finalizada")
+
+        end = time.perf_counter()
+        total = end - start
+        print(f"Coleta inicial finalizada, tempo total de coleta {total:.2f}")
         print("=="*40)
         print("Inicie a observação a partir de agora com [minicli -o] ou [minicli --observe]")
 	
