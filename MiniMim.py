@@ -16,6 +16,7 @@ path_arquivo_json = os.getenv('JSON_PATH')
 log_from_logging = logging.getLogger(__name__)
 url = os.getenv('API_URL')
 
+
 # Abre o arquivo de configuracao e compila os padroes para melhor desempenho.
 # Tem mais processamento na primeira rodagem por compilar todas as regras de uma vez.
 with open(caminho_de_configuracao, 'r') as arquivo_de_configuracao_puro:
@@ -112,31 +113,49 @@ def ler_arquivo(evento):
 def pre_filtro(ultimas_linhas, regras, servico_do_evento):
     """Classifica cada linha nova lida do log; o primeiro match (mais especifico) vence."""
     try:
+        qtd = 0
+        batch_de_logs = {qtd: list}
+        lista_de_lista = [[]]
         regras_do_servico = regras.get(servico_do_evento)
         if regras_do_servico is None:
             return              
+
         for cada_linha in ultimas_linhas:
             linha = cada_linha.strip()
             for regra in regras_do_servico:
-                if regra["padrao"].search(linha):
-                    envio_para_API(linha,servico_do_evento,regra["id"])
-                    break
-                else:
-                    pass
+                    if regra["padrao"].search(linha):
+                        lista_de_lista.append([linha, servico_do_evento, regra["id"]])
+                        batch_de_logs.update({qtd: [linha, servico_do_evento, regra["id"]]})
+                        qtd+=1
+                        #print(batch_de_logs.values())
+                        #batch_de_logs[qtd].append(linha,servico_do_evento,regra["id"])
+                        
+                        if qtd == 100:
+                            #print(batch_de_logs)
+                            #lista_de_lista.clear()
+                            envio_para_API(batch_de_logs)
+                            batch_de_logs.clear()
+                            qtd = 0
+                            break
+                        break
+                    else:
+                        pass
+        if qtd:
+            envio_para_API(batch_de_logs)
     except Exception:
         log_from_logging.exception("falha no pre_filtro, servico=%s", servico_do_evento)
 
-def envio_para_API(log, servico, regra):
+def envio_para_API(batch_de_logs):
     """Envia o log classificado para o centralizador."""
     headers = {"Content-Type": "application/json"}
-    data = {"servico": servico, "log": log, "regra": regra}
+    data = {"batch": batch_de_logs}
 
     try:
         response = requests.post(url, json=data, headers=headers, timeout=5)
         if response.status_code == 200:
             return
         else:
-            print(f"Falha ao enviar log_from_logging Status code: {response.status_code}")
+            print(f"Falha ao enviar, Status code: {response.status_code}")
     except requests.exceptions.RequestException:
         log_from_logging.exception("Erro ao enviar log para o centralizador")
 

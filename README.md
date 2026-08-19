@@ -95,6 +95,8 @@ gunicorn --bind 127.0.0.1:8000 api:app                # Linux
 - [x] Tornar o endpoint da API configurável pelo `.env`
 - [x] Unificar as duas entradas num único CLI (`minicli.py`)
 - [x] Oferecer uma limpeza do índice de leitura pelo CLI
-- [ ] Validar variáveis de ambiente na inicialização
+- [x] Envio por batch de 100 logs
+- [ ] Tratar observabilidade de menos de 100 logs
+- [x] Validar variáveis de ambiente na inicialização
 - [x] Tratar truncamento do arquivo de log, reiniciando a leitura do zero
 - [ ] Tratar rotação, com o arquivo renomeado ou recriado
