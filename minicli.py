@@ -248,7 +248,7 @@ class AjudaEmPortugues(argparse.HelpFormatter):
 
 def main():
     parser = argparse.ArgumentParser(prog='MiniMim',
-                                     description='O melhor agente CLI do bairro do criador',
+                                     description='O melhor agente de coleta do bairro',
                                      formatter_class=AjudaEmPortugues,
                                      add_help=False)
     # Titulo da secao de argumentos, que o argparse escreve em ingles por padrao.
