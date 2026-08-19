@@ -14,14 +14,20 @@ caminho_de_configuracao = os.getenv('CONFIGURATION_FILE')
 log_path = os.getenv('LOG_PATH').split(',')
 path_arquivo_json = os.getenv('JSON_PATH')
 log_from_logging = logging.getLogger(__name__)
+url = os.getenv('API_URL')
+qtd = 0
 
 # Abre o arquivo de configuracao e compila os padroes para melhor desempenho.
 # Tem mais processamento na primeira rodagem por compilar todas as regras de uma vez.
 with open(caminho_de_configuracao, 'r') as arquivo_de_configuracao_puro:
     configuracao = yaml.safe_load(arquivo_de_configuracao_puro)
 
-with open(path_arquivo_json, 'r') as arquivo_json:
-    relacao_pos_file = json.load(arquivo_json)
+# O indice de leitura e estado local: pode nao existir na primeira execucao.
+if os.path.exists(path_arquivo_json):
+    with open(path_arquivo_json, 'r') as arquivo_json:
+        relacao_pos_file = json.load(arquivo_json)
+else:
+    relacao_pos_file = {}
 
 regras = {
     servico: sorted(
@@ -89,48 +95,70 @@ def ler_arquivo(evento):
                 return
 
             completo = conteudo[:ultima_quebra + 1]
-            novas_linhas = completo.decode("utf-8").splitlines()
+            novas_linhas = completo.decode("utf-8",errors="replace").splitlines()
             
             # Reposiciona exatamente no fim da ultima linha completa.
             # seek() em modo texto so aceita posicoes vindas de tell(),
             # entao relemos so o trecho completo para obter uma posicao valida.
             relacao_pos_file[evento] = pos_inicial + len(completo)
             servico_do_evento = os.path.basename(os.path.dirname(evento))
-            json.dump(relacao_pos_file,open(path_arquivo_json,"w"))
             pre_filtro(novas_linhas, regras, servico_do_evento)
+            json_aberto = open(path_arquivo_json,"w")
+            json.dump(relacao_pos_file,json_aberto)
+            json_aberto.close()
                               
     except Exception:
-        log_from_logging.exception("falha no pre_filtro, servico=%s", servico_do_evento)
+        log_from_logging.exception("falha no pre_filtro, servico=%s", os.path.basename(os.path.dirname(evento)))
 
 def pre_filtro(ultimas_linhas, regras, servico_do_evento):
     """Classifica cada linha nova lida do log; o primeiro match (mais especifico) vence."""
     try:
+        soma = qtd
+        batch_de_logs = {soma: list}
         regras_do_servico = regras.get(servico_do_evento)
         if regras_do_servico is None:
             return              
-        for cada_linha in ultimas_linhas:
-            linha = cada_linha.strip()
+
+        if len(ultimas_linhas) == 1:
             for regra in regras_do_servico:
-                if regra["padrao"].search(linha):
-                    envio_para_API(linha,servico_do_evento)
-                    break
+                if regra["padrao"].search(ultimas_linhas[0]):
+                    batch_de_logs.update({soma: [ultimas_linhas[0], servico_do_evento, regra["id"]]})
+                    soma+=1
+                    print(batch_de_logs)
                 else:
-                    pass
+                    pass 
+
+        if len(ultimas_linhas) > 1:         
+            for cada_linha in ultimas_linhas:
+                linha = cada_linha.strip()
+                for regra in regras_do_servico:
+                        if regra["padrao"].search(linha):
+                            batch_de_logs.update({soma: [linha, servico_do_evento, regra["id"]]})
+                            soma+=1
+                            if soma >= 100:
+                                envio_para_API(batch_de_logs)
+                                batch_de_logs.clear()
+                                soma = 0
+                                break
+                            break
+                        else:
+                            pass
+
     except Exception:
         log_from_logging.exception("falha no pre_filtro, servico=%s", servico_do_evento)
 
-def envio_para_API(log, servico):
+
+def envio_para_API(batch_de_logs):
     """Envia o log classificado para o centralizador."""
-    url = "http://127.0.0.1:8000"  # Substitua pelo endpoint da sua API
     headers = {"Content-Type": "application/json"}
-    data = {"servico": servico, "log": log}
+    data = {"batch": batch_de_logs}
 
     try:
         response = requests.post(url, json=data, headers=headers, timeout=5)
         if response.status_code == 200:
             return
         else:
-            print(f"Falha ao enviar log_from_logging Status code: {response.status_code}")
+            print(f"Falha ao enviar, Status code: {response.status_code}")
     except requests.exceptions.RequestException:
         log_from_logging.exception("Erro ao enviar log para o centralizador")
 
