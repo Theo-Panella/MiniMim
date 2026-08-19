@@ -3,13 +3,15 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cli"
+name = "Minicli"
 version = "0.1.0"
 dependencies = [
     "python-dotenv",
     "requests",
     "PyYAML",
     "watchdog",
+    "rich",
+    "regex",
 ]
 
 [project.scripts]

@@ -1,5 +1,9 @@
 # MiniMim
 
+<p align="center">
+  <img src="logo.png" alt="MiniMim" width="300">
+</p>
+
 Agente leve de coleta e pré-filtragem de logs. Monitora vários arquivos de log em tempo real e classifica cada linha nova com regras de regex por serviço.
 
 A ideia é fazer a triagem **na ponta**: em vez de mandar o log inteiro pra um servidor central, o MiniMim decide localmente o que é relevante, reduzindo tráfego e processamento.
@@ -65,13 +69,19 @@ python minicli.py -t
 Carga inicial (lê o que já existe nos logs):
 
 ```bash
-python minicli.py -s
+python minicli.py -l
 ```
 
 Monitoramento contínuo:
 
 ```bash
-python minicli.py -b
+python minicli.py -o
+```
+
+Limpa o ponteiro de leitura:
+
+```bash
+python minicli.py -c
 ```
 
 `escreve_log_teste.py` gera linhas de teste continuamente em `Openssh/OpenSSH_2k.log`, útil pra ver o watchdog reagir. Encerre qualquer processo com `Ctrl+C`.
@@ -88,9 +98,11 @@ gunicorn --bind 127.0.0.1:8000 api:app                # Linux
 ## Roadmap
 
 - [x] Envio da linha classificada para uma API central
-- [ ] Tornar o endpoint da API configurável pelo `.env`
+- [x] Tornar o endpoint da API configurável pelo `.env`
 - [x] Unificar as duas entradas num único CLI (`minicli.py`)
-- [ ] Oferecer uma limpeza do índice de leitura pelo CLI
-- [ ] Validar variáveis de ambiente na inicialização
+- [x] Oferecer uma limpeza do índice de leitura pelo CLI
+- [x] Envio por batch de 100 logs
+- [ ] Tratar observabilidade de menos de 100 logs
+- [x] Validar variáveis de ambiente na inicialização
 - [x] Tratar truncamento do arquivo de log, reiniciando a leitura do zero
 - [ ] Tratar rotação, com o arquivo renomeado ou recriado

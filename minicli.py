@@ -2,11 +2,14 @@
 import argparse
 import os
 import re
+import json
 
 import yaml
+import time
 from dotenv import load_dotenv, set_key
-from rich.progress import Progress, MofNCompleteColumn, TextColumn, BarColumn
+from rich.progress import Progress, MofNCompleteColumn, TextColumn, BarColumn, TimeRemainingColumn
 
+load_dotenv()
 CAMINHO_ENV = ".env"
 CONFIGURACAO_PADRAO = os.path.join("Configuration_Files", "filter.yaml")
 
@@ -93,11 +96,6 @@ def salva_configuracao(caminho, regras, cabecalho=""):
                        sort_keys=False, default_flow_style=False)
 
 
-def normaliza_diretorio(caminho):
-    """Caminho absoluto terminando em separador: o agente concatena o nome do arquivo."""
-    absoluto = os.path.abspath(os.path.expanduser(caminho))
-    return absoluto + os.sep
-
 
 # --------------------------------------------------------------------------- #
 # Tutorial
@@ -182,7 +180,7 @@ def executa_tutorial():
             print("  ! Informe pelo menos um diretorio.")
             continue
 
-        diretorio = normaliza_diretorio(entrada)
+        diretorio = entrada
 
         if not os.path.isdir(diretorio):
             if confirma(f"  '{diretorio}' nao existe. Criar?", padrao=True):
@@ -222,26 +220,53 @@ def executa_tutorial():
         open(CAMINHO_ENV, 'w', encoding='utf-8').close()
     set_key(CAMINHO_ENV, "LOG_PATH", ",".join(diretorios))
     set_key(CAMINHO_ENV, "CONFIGURATION_FILE", caminho_de_configuracao)
-    set_key(CAMINHO_ENV, "JSON_PATH", "Configuration_Files/filestate.json")
+    caminho_json = "Configuration_Files/filestate.json"
+    if not os.path.exists(caminho_json):
+        os.makedirs(os.path.dirname(caminho_json), exist_ok=True)
+        with open(caminho_json, 'w', encoding='utf-8') as arquivo_json:
+            json.dump({}, arquivo_json)
+        print(f"  + {caminho_json} criado.")
+    set_key(CAMINHO_ENV, "JSON_PATH", caminho_json)
+    set_key(CAMINHO_ENV, "API_URL", "http://127.0.0.1:8000")
     print(f"  + {os.path.abspath(CAMINHO_ENV)} atualizado.")
 
     print("\nPronto. Proximos passos:")
-    print("  python minicli.py -start     # carga inicial dos logs existentes")
-    print("  python MiniMim.py   # monitoramento continuo")
+    print("  minicli --load  # carga inicial dos logs existentes")
+    print("  minicli --observe   # monitoramento continuo")
 
 
 # --------------------------------------------------------------------------- #
 # CLI
 # --------------------------------------------------------------------------- #
 
-def main():
-    parser = argparse.ArgumentParser(prog='MiniMim', description='The best CLI agent in my neighborhood')
+class AjudaEmPortugues(argparse.HelpFormatter):
+    """Troca o prefixo 'usage:' do argparse por 'uso:'."""
 
-    parser.add_argument('-t','--tutorial', action='store_true', help="Interactive step-by-step setup of configuration files")
-    parser.add_argument('-s','--start', action='store_true', help="First load, make the first log colection")
-    parser.add_argument('-b','--observe', action='store_true', help="Start observation")
+    def add_usage(self, usage, actions, groups, prefix=None):
+        super().add_usage(usage, actions, groups, prefix or "uso: ")
+
+
+def main():
+    parser = argparse.ArgumentParser(prog='MiniMim',
+                                     description='O melhor agente de coleta do bairro',
+                                     formatter_class=AjudaEmPortugues,
+                                     add_help=False)
+    # Titulo da secao de argumentos, que o argparse escreve em ingles por padrao.
+    parser._optionals.title = "opcoes"
+
+    parser.add_argument('-h','--help', action='help', help="Mostra esta mensagem de ajuda e sai")
+    parser.add_argument('-t','--tutorial', action='store_true', help="Configuracao interativa passo a passo dos arquivos de configuracao")
+    parser.add_argument('-l','--load', action='store_true', help="Faz a carga inicial dos arquivos nos diretorios definidos no .env")
+    parser.add_argument('-o','--observe', action='store_true', help="Inicia a observacao continua dos diretorios de log")
+    parser.add_argument('-c','--clean', action='store_true', help="Limpa o arquivo do ponteiro de leitura")
 
     args = parser.parse_args()
+
+    log_path = [p for p in (os.getenv('LOG_PATH') or '').split(',') if p.strip()]
+    
+    path_arquivo_json = os.getenv('JSON_PATH')
+    
+    caminho_de_configuracao = os.getenv('CONFIGURATION_FILE')
 
     if args.tutorial:
         try:
@@ -250,33 +275,29 @@ def main():
             print("\nTutorial cancelado.")
         return
 
-    log_path = [p for p in (os.getenv('LOG_PATH') or '').split(',') if p.strip()]
-    
-    path_arquivo_json = os.getenv('JSON_PATH')
-    
-    caminho_de_configuracao = os.getenv('CONFIGURATION_FILE')
-
-    if args.start:
+    if args.load:
+        start = time.perf_counter()
         if not log_path or not path_arquivo_json or not caminho_de_configuracao:
-            print("Nao configurado, rode: python minicli.py --tutorial")
             return
-        # Import tardio: MiniMim le o .env no import e exige config valida.
         print("Iniciando Coleta de Logs")
         print("=="*40)
+
+        # Import tardio: MiniMim le o .env no import e exige config valida.
         from MiniMim import popula_indice
         for workdir in log_path:
-            with Progress(TextColumn(f"[progress.description]Processando arquivos de {workdir}..."),BarColumn(),MofNCompleteColumn()) as progress:
+            with Progress(TextColumn(f"[progress.description]Processando arquivos de {workdir}..."),BarColumn(),MofNCompleteColumn(),TimeRemainingColumn()) as progress:
                 task = progress.add_task(f"[green]", total=sum(1 for arquivo_teste in os.scandir(workdir) if arquivo_teste.is_file()))
-                while not progress.finished:
-                    for arquivo in os.scandir(workdir):
-                        popula_indice(os.path.join(workdir, arquivo.name))
-                        progress.update(task, advance=1)
+                for arquivo in os.scandir(workdir):
+                    popula_indice(os.path.join(workdir, arquivo.name))
+                    progress.update(task, advance=1)
             print(f"Diretorio {workdir} finalizado")
             print("=="*40)
-        
-        print("Coleta inicial finalizada")
+
+        end = time.perf_counter()
+        total = end - start
+        print(f"Coleta inicial finalizada, tempo total de coleta {total:.2f}")
         print("=="*40)
-        print("Inicie a observação a partir de agora com [minicli -b] ou [minicli --observe]")
+        print("Inicie a observação a partir de agora com [minicli -o] ou [minicli --observe]")
 	
         return
 
@@ -286,9 +307,21 @@ def main():
         else:
             from MiniMim import cria_observer
             cria_observer()
+
+    if args.clean:
+        if path_arquivo_json:
+            json_aberto = open(path_arquivo_json,"w")
+            json.dump({},json_aberto)
+            json_aberto.close()
+            print("="*23)
+            print("= Arquivo .json limpo =")
+            print("="*23)
+        else:
+            print("Arquivo .json não localizado")
+            return
+
     else:
         parser.print_help()
-
 
 if __name__ == "__main__":
     load_dotenv()
