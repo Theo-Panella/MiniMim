@@ -69,13 +69,19 @@ python minicli.py -t
 Carga inicial (lê o que já existe nos logs):
 
 ```bash
-python minicli.py -s
+python minicli.py -l
 ```
 
 Monitoramento contínuo:
 
 ```bash
-python minicli.py -b
+python minicli.py -o
+```
+
+Limpa o ponteiro de leitura:
+
+```bash
+python minicli.py -c
 ```
 
 `escreve_log_teste.py` gera linhas de teste continuamente em `Openssh/OpenSSH_2k.log`, útil pra ver o watchdog reagir. Encerre qualquer processo com `Ctrl+C`.
