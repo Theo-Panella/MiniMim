@@ -2,6 +2,15 @@ name: "CodeQL Analyses"
 
 on:
   push:
+    paths-ignore:
+      - '*.md'
+      - '*.png'
+      - '*.yaml'
+      - '*.log'
+      - '*.yml'
+      - 'Apache/*'
+      - 'Openss/*'
+      - '.gitignore'
     branches:
       - main
       - dev
