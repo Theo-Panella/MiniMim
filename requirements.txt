@@ -7,6 +7,10 @@ requests==2.34.2
 rich==15.0.0
 watchdog==6.0.0
 
+# Servidor WSGI para servir a api.py; o gunicorn importa fcntl e so roda em Linux
+gunicorn==25.1.0; sys_platform != "win32"
+waitress==3.0.2; sys_platform == "win32"
+
 # Dependencias transitivas, fixadas para builds reprodutiveis
 annotated-types==0.7.0
 blinker==1.9.0
@@ -20,6 +24,7 @@ Jinja2==3.1.6
 markdown-it-py==4.2.0
 MarkupSafe==3.0.3
 mdurl==0.1.2
+packaging==26.2
 pydantic_core==2.46.4
 Pygments==2.20.0
 typing-inspection==0.4.2
