@@ -6,6 +6,7 @@ import json
 import logging
 import requests
 import yaml
+import threading
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
@@ -16,7 +17,12 @@ path_arquivo_json = os.getenv('JSON_PATH')
 log_from_logging = logging.getLogger(__name__)
 url = os.getenv('API_URL')
 qtd = 0
-batch_de_logs = {qtd: list}
+batch_de_logs = {}
+# Fecha o lote por tamanho; o que sobrar sai por tempo no --observe.
+TAMANHO_DO_LOTE = 100
+INTERVALO_DE_ENVIO = 5.0
+ultimo_envio = time.monotonic()
+lock = threading.Lock()
 
 # Abre o arquivo de configuracao e compila os padroes para melhor desempenho.
 # Tem mais processamento na primeira rodagem por compilar todas as regras de uma vez.
@@ -59,6 +65,7 @@ def cria_observer():
     try:
         while True:
             time.sleep(2)
+            envia_sobrando()
     finally:
         print("Acabou")
         observer.stop()
@@ -130,50 +137,57 @@ def clear_batch():
     global batch_de_logs
     batch_de_logs.clear()
 
+def despacha_lote():
+    """ Envia o que estiver acumulado e reinicia o contador e o relogio """
+    global ultimo_envio
+    ultimo_envio = time.monotonic()
+    if qtd:
+        envio_para_API(batch_de_logs)
+        clear_batch()
+        soma_mais_um(True)
+
+def envia_sobrando():
+    """ Despacha o lote incompleto quando o intervalo vence; chamado pelo observer """
+    with lock:
+        if qtd and time.monotonic() - ultimo_envio >= INTERVALO_DE_ENVIO:
+            despacha_lote()
+
+def finaliza_envio():
+    """ Despacha o resto sem esperar o intervalo; usado no fim da carga inicial """
+    with lock:
+        despacha_lote()
+
 def pre_filtro(ultimas_linhas, regras, servico_do_evento):
     """Classifica cada linha nova lida do log; o primeiro match (mais especifico) vence."""
     try:
         regras_do_servico = regras.get(servico_do_evento)
         if regras_do_servico is None:
-            return              
+            return
 
-        if len(ultimas_linhas) == 1:
-            print(len(ultimas_linhas))
-            for regra in regras_do_servico:
-                if regra["padrao"].search(ultimas_linhas[0]):
-                    #batch_de_logs.update({qtd: [ultimas_linhas[0], servico_do_evento, regra["id"]]})
-                    update_batch(ultimas_linhas[0], servico_do_evento, regra["id"])
-                    soma_mais_um(False)
-                    if qtd >= 100:
-                        envio_para_API(batch_de_logs)
-                        clear_batch()
-                        soma_mais_um(True)
-                        break
-                    break
-                else:
-                    break 
-
-        if len(ultimas_linhas) >= 2:         
-            for cada_linha in ultimas_linhas:
-                linha = cada_linha.strip()
+        with lock:
+            if len(ultimas_linhas) == 1:
+                linha = ultimas_linhas[0].strip()
                 for regra in regras_do_servico:
+                    if regra["padrao"].search(linha):
+                        update_batch(linha, servico_do_evento, regra["id"])
+                        soma_mais_um(False)
+                        if qtd >= TAMANHO_DO_LOTE:
+                            despacha_lote()
+                        break
+
+            if len(ultimas_linhas) > 1:
+                for cada_linha in ultimas_linhas:
+                    linha = cada_linha.strip()
+                    for regra in regras_do_servico:
                         if regra["padrao"].search(linha):
-                            #batch_de_logs.update({qtd: [linha, servico_do_evento, regra["id"]]})
                             update_batch(linha, servico_do_evento, regra["id"])
                             soma_mais_um(False)
-                            if qtd >= 100:
-                                envio_para_API(batch_de_logs)
-                                clear_batch()
-                                soma_mais_um(True)
-                                break
+                            if qtd >= TAMANHO_DO_LOTE:
+                                despacha_lote()
                             break
-                        else:
-                            pass
 
-        if qtd:
-            envio_para_API(batch_de_logs)
-            clear_batch()
-            soma_mais_um(True)
+                # A carga inicial le o arquivo inteiro de uma vez: fecha o resto aqui.
+                despacha_lote()
 
     except Exception:
         log_from_logging.exception("falha no pre_filtro, servico=%s", servico_do_evento)
