@@ -283,7 +283,8 @@ def main():
         print("=="*40)
 
         # Import tardio: MiniMim le o .env no import e exige config valida.
-        from MiniMim import popula_indice, finaliza_envio
+        from MiniMim import popula_indice
+        from MiniMim import Auxiliares
         for workdir in log_path:
             with Progress(TextColumn(f"[progress.description]Processando arquivos de {workdir}..."),BarColumn(),MofNCompleteColumn(),TimeRemainingColumn()) as progress:
                 task = progress.add_task(f"[green]", total=sum(1 for arquivo_teste in os.scandir(workdir) if arquivo_teste.is_file()))
@@ -294,7 +295,7 @@ def main():
             print("=="*40)
 
         # O processo termina logo abaixo: manda o que sobrou do ultimo lote.
-        finaliza_envio()
+        Auxiliares.finaliza_envio()
 
         end = time.perf_counter()
         total = end - start
