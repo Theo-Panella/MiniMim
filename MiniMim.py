@@ -63,59 +63,12 @@ def cria_observer():
     try:
         while True:
             time.sleep(2)
-            gerencia_batch.envia_sobrando()
+            envia_sobrando()
     finally:
         print("Acabou")
         observer.stop()
         observer.join()
 
-class GerenciaBatch:
-    def __init__(self):
-        self.qtd = 0
-        self.batch_de_logs = {}
-        self.ultimo_envio = time.monotonic()
-        self.lock = threading.Lock()
-    
-    def soma_mais_um(self,zera: bool):
-        """ Soma sequencial de linhas lidas """
-        if zera:
-            self.qtd = 0
-        else:
-            self.qtd+=1
-
-
-    def update_batch(self,ultimas_linhas, servico_do_evento, regra):
-        """ Adiciona as informações a batch de logs """
-        self.batch_de_logs.update({self.qtd: [ultimas_linhas, servico_do_evento, regra]})
-
-
-    def clear_batch(self):
-        """ Limpa a batch de logs a nivel global """
-        self.batch_de_logs.clear()
-
-
-    def despacha_lote(self):
-        """ Envia o que estiver acumulado e reinicia o contador e o relogio """
-        self.ultimo_envio = time.monotonic()
-        if self.qtd:
-            envio_para_API(self.batch_de_logs)
-            gerencia_batch.clear_batch()
-            gerencia_batch.soma_mais_um(True)
-
-
-    def envia_sobrando(self):
-        """ Despacha o lote incompleto quando o intervalo vence; chamado pelo observer """
-        with self.lock:
-            if self.batch_de_logs and time.monotonic() - self.ultimo_envio >= INTERVALO_DE_ENVIO:
-                gerencia_batch.despacha_lote()
-
-
-    def finaliza_envio(self):
-        """ Despacha o resto sem esperar o intervalo; usado no fim da carga inicial """
-        with self.lock:
-            gerencia_batch.despacha_lote()
-
-gerencia_batch = GerenciaBatch()
 
 class MyEventHandler(FileSystemEventHandler):
     def __init__(self):
@@ -163,6 +116,45 @@ def ler_arquivo(evento):
     except Exception:
         log_from_logging.exception("falha no pre_filtro, servico=%s", os.path.basename(os.path.dirname(evento)))
 
+# Funções Auxiliares de escrita
+def soma_mais_um(zera: bool):
+    """ Soma sequencial de linhas lidas """
+    global qtd
+    if zera:
+        qtd = 0
+    else:
+        qtd+=1
+
+def update_batch(ultimas_linhas, servico_do_evento, regra):
+    """ Adiciona as informações a batch de logs """
+    global batch_de_logs
+    batch_de_logs.update({qtd: [ultimas_linhas, servico_do_evento, regra]})
+
+def clear_batch():
+    """ Limpa a batch de logs a nivel global """
+    global batch_de_logs
+    batch_de_logs.clear()
+
+def despacha_lote():
+    """ Envia o que estiver acumulado e reinicia o contador e o relogio """
+    global ultimo_envio
+    ultimo_envio = time.monotonic()
+    if qtd:
+        envio_para_API(batch_de_logs)
+        clear_batch()
+        soma_mais_um(True)
+
+def envia_sobrando():
+    """ Despacha o lote incompleto quando o intervalo vence; chamado pelo observer """
+    with lock:
+        if qtd and time.monotonic() - ultimo_envio >= INTERVALO_DE_ENVIO:
+            despacha_lote()
+
+def finaliza_envio():
+    """ Despacha o resto sem esperar o intervalo; usado no fim da carga inicial """
+    with lock:
+        despacha_lote()
+
 def pre_filtro(ultimas_linhas, regras, servico_do_evento):
     """Classifica cada linha nova lida do log; o primeiro match (mais especifico) vence."""
     try:
@@ -175,10 +167,10 @@ def pre_filtro(ultimas_linhas, regras, servico_do_evento):
                 linha = ultimas_linhas[0].strip()
                 for regra in regras_do_servico:
                     if regra["padrao"].search(linha):
-                        gerencia_batch.update_batch(linha, servico_do_evento, regra["id"])
-                        gerencia_batch.soma_mais_um(False)
-                        if gerencia_batch.qtd >= TAMANHO_DO_LOTE:
-                            gerencia_batch.despacha_lote()
+                        update_batch(linha, servico_do_evento, regra["id"])
+                        soma_mais_um(False)
+                        if qtd >= TAMANHO_DO_LOTE:
+                            despacha_lote()
                         break
 
             if len(ultimas_linhas) > 1:
@@ -186,14 +178,14 @@ def pre_filtro(ultimas_linhas, regras, servico_do_evento):
                     linha = cada_linha.strip()
                     for regra in regras_do_servico:
                         if regra["padrao"].search(linha):
-                            gerencia_batch.update_batch(linha, servico_do_evento, regra["id"])
-                            gerencia_batch.soma_mais_um(False)
-                            if gerencia_batch.qtd >= TAMANHO_DO_LOTE:
-                                gerencia_batch.despacha_lote()
+                            update_batch(linha, servico_do_evento, regra["id"])
+                            soma_mais_um(False)
+                            if qtd >= TAMANHO_DO_LOTE:
+                                despacha_lote()
                             break
 
                 # A carga inicial le o arquivo inteiro de uma vez: fecha o resto aqui.
-                gerencia_batch.despacha_lote()
+                despacha_lote()
 
     except Exception:
         log_from_logging.exception("falha no pre_filtro, servico=%s", servico_do_evento)
