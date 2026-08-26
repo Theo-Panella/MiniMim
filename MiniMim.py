@@ -16,6 +16,10 @@ log_path = os.getenv('LOG_PATH').split(',')
 path_arquivo_json = os.getenv('JSON_PATH')
 log_from_logging = logging.getLogger(__name__)
 url = os.getenv('API_URL')
+qtd = 0
+batch_de_logs = {}
+ultimo_envio = time.monotonic()
+lock = threading.Lock()
 
 # Fecha o lote por tamanho; o que sobrar sai por tempo no --observe.
 TAMANHO_DO_LOTE = 100
@@ -162,7 +166,7 @@ def pre_filtro(ultimas_linhas, regras, servico_do_evento):
         if regras_do_servico is None:
             return
 
-        with gerencia_batch.lock:
+        with lock:
             if len(ultimas_linhas) == 1:
                 linha = ultimas_linhas[0].strip()
                 for regra in regras_do_servico:
