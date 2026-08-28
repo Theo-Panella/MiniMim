@@ -23,7 +23,6 @@ MiniMim-Agent/
 │   ├── filter.yaml            # regras de filtragem, uma seção por serviço
 │   └── filestate.json         # índice de leitura por arquivo, versionado vazio
 ├── Apache/, Openssh/          # pastas de log de amostra, uma por serviço
-├── legacy/MiniMim.py          # primeira versão, mantida só de referência
 ├── escreve_log_teste.py       # gera linhas de log continuamente, pra teste
 └── .env                       # configuração local (não versionado)
 ```
@@ -39,7 +38,8 @@ O nome de cada pasta de log precisa bater com a seção correspondente no `filte
 1. Na inicialização, o `.env` é carregado, o `filter.yaml` é lido e o índice de posições em `JSON_PATH` é restaurado; as regras de cada serviço são compiladas e ordenadas por `especificidade` (maior primeiro).
 2. O [watchdog](https://pypi.org/project/watchdog/) observa cada diretório listado em `LOG_PATH`. A cada modificação, o agente lê só as linhas novas de cada arquivo e regrava a posição do último `seek` no arquivo de índice, então a leitura continua de onde parou entre execuções.
 3. Cada linha nova é comparada com as regras do serviço deduzido do nome da pasta; o primeiro match — o mais específico — vence.
-4. Cada linha que casa vai para `envio_para_API()`, num POST para o endpoint local fixo `http://127.0.0.1:8000`, onde o `api.py` recebe e registra.
+4. Cada linha que casa vai para `envio_para_API()`, num POST para o endpoint definido em .env.
+> `api.py` é somente para teste de funcionalidade por enquanto, não possui autenticação e roda em debug de forma proposital
 
 ---
 

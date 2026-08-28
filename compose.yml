@@ -1,0 +1,22 @@
+services:
+  agent:
+    build: .
+    networks: 
+      - subnet-agent
+
+  api:
+    build: .
+    ports:
+      - 8000:8000
+    networks: 
+      - subnet-api
+
+    command: |
+      gunicorn --bind 127.0.0.1:8000 api:app
+
+networks:
+  subnet-agent:
+    driver: bridge
+
+  subnet-api:
+    driver: bridge
