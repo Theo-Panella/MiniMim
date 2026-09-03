@@ -307,6 +307,7 @@ def main():
     if args.observe:
         if not log_path or not path_arquivo_json or not caminho_de_configuracao:
             print("Nao configurado, rode: python minicli.py --tutorial")
+            return
         else:
             from MiniMim import cria_observer
             cria_observer()

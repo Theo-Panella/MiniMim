@@ -11,6 +11,15 @@ from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
 load_dotenv()
+
+VARIAVEIS_DE_AMBIENTE = [os.getenv('CONFIGURATION_FILE'), os.getenv('LOG_PATH'),
+                         os.getenv('JSON_PATH'), os.getenv('API_URL')]
+
+# Checar variaveis de ambiente
+if not all(VARIAVEIS_DE_AMBIENTE):
+    print("Erro ao iniciar MiniMim, configure o ambiente usando minicli -t")
+    raise SystemExit() 
+
 caminho_de_configuracao = os.getenv('CONFIGURATION_FILE')
 log_path = os.getenv('LOG_PATH').split(',')
 path_arquivo_json = os.getenv('JSON_PATH')
@@ -24,7 +33,6 @@ lock = threading.Lock()
 # Fecha o lote por tamanho; o que sobrar sai por tempo no --observe.
 TAMANHO_DO_LOTE = 100
 INTERVALO_DE_ENVIO = 5.0
-
 
 # Abre o arquivo de configuracao e compila os padroes para melhor desempenho.
 # Tem mais processamento na primeira rodagem por compilar todas as regras de uma vez.

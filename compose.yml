@@ -1,22 +1,17 @@
 services:
-  agent:
-    build: .
-    networks: 
-      - subnet-agent
-
   api:
     build: .
     ports:
       - 8000:8000
-    networks: 
-      - subnet-api
 
-    command: |
-      gunicorn --bind 127.0.0.1:8000 api:app
+    command: gunicorn --bind 0.0.0.0:8000 api:app
 
-networks:
-  subnet-agent:
-    driver: bridge
+  agent:
+    build: .
+    volumes:
+      - Log_paths:/app/Log_paths:ro
 
-  subnet-api:
-    driver: bridge
+    command: echo "Agente está de pé, QUE COMECE A CAÇA DE LOGS!"
+
+volumes:
+  Log_paths:
