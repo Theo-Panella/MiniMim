@@ -108,3 +108,21 @@ gunicorn --bind 127.0.0.1:8000 api:app                # Linux
 - [x] Tratar truncamento do arquivo de log, reiniciando a leitura do zero
 - [ ] Fazer a tratativa de logs com API fora do ar
 - [ ] Tratar rotação, com o arquivo renomeado ou recriado
+
+### Correções pendentes
+
+Levantadas em revisão do código, em ordem de severidade.
+
+**Críticas**
+
+- [ ] Corrigir o `compose.yml`: rede única entre `agent` e `api`, bind em `0.0.0.0`, comando do agente e montagem do `.env` e dos diretórios de log
+- [ ] Gravar o `filestate.json` de forma atômica e tolerar o arquivo corrompido na leitura, para um `Ctrl+C` não impedir a próxima execução
+- [ ] Validar as variáveis de ambiente dentro do `MiniMim.py`, e não só pelo CLI
+- [ ] Só avançar o ponteiro de leitura depois do envio confirmado pela API
+
+**Altas**
+
+- [ ] Não persistir a posição de leitura quando o `pre_filtro` levanta exceção
+- [ ] Não avançar o ponteiro de um serviço que ainda não tem regras no `filter.yaml`
+- [ ] Respeitar o lote de 100 no `--observe`, sem despachar a cada evento multilinha
+- [ ] Enviar para a API fora do lock, para não travar a thread do watchdog por até 5s
