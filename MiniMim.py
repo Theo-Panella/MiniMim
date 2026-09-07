@@ -28,10 +28,9 @@ url = os.getenv('API_URL')
 qtd = 0
 batch_de_logs = {}
 ultimo_envio = time.monotonic()
-lock = threading.Lock()
 
 # Fecha o lote por tamanho; o que sobrar sai por tempo no --observe.
-TAMANHO_DO_LOTE = 100
+TAMANHO_DO_LOTE = 10
 INTERVALO_DE_ENVIO = 5.0
 
 # Abre o arquivo de configuracao e compila os padroes para melhor desempenho.
@@ -158,14 +157,12 @@ def despacha_lote():
 
 def envia_sobrando():
     """ Despacha o lote incompleto quando o intervalo vence; chamado pelo observer """
-    with lock:
-        if qtd and time.monotonic() - ultimo_envio >= INTERVALO_DE_ENVIO:
-            despacha_lote()
+    if qtd and time.monotonic() - ultimo_envio >= INTERVALO_DE_ENVIO:
+        despacha_lote()
 
 def finaliza_envio():
     """ Despacha o resto sem esperar o intervalo; usado no fim da carga inicial """
-    with lock:
-        despacha_lote()
+    despacha_lote()
 
 def pre_filtro(ultimas_linhas, regras, servico_do_evento):
     """Classifica cada linha nova lida do log; o primeiro match (mais especifico) vence."""
@@ -174,9 +171,9 @@ def pre_filtro(ultimas_linhas, regras, servico_do_evento):
         if regras_do_servico is None:
             return
 
-        with lock:
-            if len(ultimas_linhas) == 1:
-                linha = ultimas_linhas[0].strip()
+        if len(ultimas_linhas) >= 1:
+            for cada_linha in ultimas_linhas:
+                linha = cada_linha.strip()
                 for regra in regras_do_servico:
                     if regra["padrao"].search(linha):
                         update_batch(linha, servico_do_evento, regra["id"])
@@ -184,20 +181,6 @@ def pre_filtro(ultimas_linhas, regras, servico_do_evento):
                         if qtd >= TAMANHO_DO_LOTE:
                             despacha_lote()
                         break
-
-            if len(ultimas_linhas) > 1:
-                for cada_linha in ultimas_linhas:
-                    linha = cada_linha.strip()
-                    for regra in regras_do_servico:
-                        if regra["padrao"].search(linha):
-                            update_batch(linha, servico_do_evento, regra["id"])
-                            soma_mais_um(False)
-                            if qtd >= TAMANHO_DO_LOTE:
-                                despacha_lote()
-                            break
-
-                # A carga inicial le o arquivo inteiro de uma vez: fecha o resto aqui.
-                despacha_lote()
 
     except Exception:
         log_from_logging.exception("falha no pre_filtro, servico=%s", servico_do_evento)
