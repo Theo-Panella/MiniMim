@@ -7,6 +7,7 @@ import logging
 import requests
 import yaml
 import threading
+import portalocker
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
@@ -28,6 +29,7 @@ url = os.getenv('API_URL')
 qtd = 0
 batch_de_logs = {}
 ultimo_envio = time.monotonic()
+lock = threading.Lock()
 
 # Fecha o lote por tamanho; o que sobrar sai por tempo no --observe.
 TAMANHO_DO_LOTE = 10
@@ -35,7 +37,7 @@ INTERVALO_DE_ENVIO = 5.0
 
 # Abre o arquivo de configuracao e compila os padroes para melhor desempenho.
 # Tem mais processamento na primeira rodagem por compilar todas as regras de uma vez.
-with open(caminho_de_configuracao, 'r') as arquivo_de_configuracao_puro:
+with portalocker.Lock(caminho_de_configuracao, mode='rb', timeout=1) as arquivo_de_configuracao_puro:
     configuracao = yaml.safe_load(arquivo_de_configuracao_puro)
 
 # O indice de leitura e estado local: pode nao existir na primeira execucao.
@@ -75,9 +77,10 @@ def cria_observer():
         while True:
             time.sleep(2)
             envia_sobrando()
-    finally:
-        print("Acabou")
+    except KeyboardInterrupt:
         observer.stop()
+    finally:
+        print("Observador Morto")
         observer.join()
 
 
@@ -101,7 +104,7 @@ def popula_indice(evento):
 
 def ler_arquivo(evento):
     try:
-        with open(evento, "rb") as file:
+        with portalocker.Lock(evento, mode="rb",timeout=1 ) as file:
             pos_inicial = relacao_pos_file[evento]
             file.seek(pos_inicial)
             conteudo = file.read()
@@ -157,30 +160,33 @@ def despacha_lote():
 
 def envia_sobrando():
     """ Despacha o lote incompleto quando o intervalo vence; chamado pelo observer """
-    if qtd and time.monotonic() - ultimo_envio >= INTERVALO_DE_ENVIO:
-        despacha_lote()
+    with lock:
+        if qtd and time.monotonic() - ultimo_envio >= INTERVALO_DE_ENVIO:
+            despacha_lote()
 
 def finaliza_envio():
     """ Despacha o resto sem esperar o intervalo; usado no fim da carga inicial """
-    despacha_lote()
+    with lock:
+        despacha_lote()
 
 def pre_filtro(ultimas_linhas, regras, servico_do_evento):
     """Classifica cada linha nova lida do log; o primeiro match (mais especifico) vence."""
     try:
-        regras_do_servico = regras.get(servico_do_evento)
-        if regras_do_servico is None:
-            return
+        with lock:
+            regras_do_servico = regras.get(servico_do_evento)
+            if regras_do_servico is None:
+                return
 
-        if len(ultimas_linhas) >= 1:
-            for cada_linha in ultimas_linhas:
-                linha = cada_linha.strip()
-                for regra in regras_do_servico:
-                    if regra["padrao"].search(linha):
-                        update_batch(linha, servico_do_evento, regra["id"])
-                        soma_mais_um(False)
-                        if qtd >= TAMANHO_DO_LOTE:
-                            despacha_lote()
-                        break
+            if len(ultimas_linhas) >= 1:
+                for cada_linha in ultimas_linhas:
+                    linha = cada_linha.strip()
+                    for regra in regras_do_servico:
+                        if regra["padrao"].search(linha):
+                            update_batch(linha, servico_do_evento, regra["id"])
+                            soma_mais_um(False)
+                            if qtd >= TAMANHO_DO_LOTE:
+                                despacha_lote()
+                            break
 
     except Exception:
         log_from_logging.exception("falha no pre_filtro, servico=%s", servico_do_evento)

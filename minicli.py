@@ -311,6 +311,7 @@ def main():
         else:
             from MiniMim import cria_observer
             cria_observer()
+            return
 
     if args.clean:
         if path_arquivo_json:
