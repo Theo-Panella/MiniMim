@@ -30,9 +30,10 @@ qtd = 0
 batch_de_logs = {}
 ultimo_envio = time.monotonic()
 lock = threading.Lock()
+api_fora = False
 
 # Fecha o lote por tamanho; o que sobrar sai por tempo no --observe.
-TAMANHO_DO_LOTE = 10
+TAMANHO_DO_LOTE = 100
 INTERVALO_DE_ENVIO = 5.0
 
 # Abre o arquivo de configuracao e compila os padroes para melhor desempenho.
@@ -123,14 +124,18 @@ def ler_arquivo(evento):
             relacao_pos_file[evento] = pos_inicial + len(completo)
             servico_do_evento = os.path.basename(os.path.dirname(evento))
             pre_filtro(novas_linhas, regras, servico_do_evento)
-            json_aberto = open(path_arquivo_json,"w")
-            json.dump(relacao_pos_file,json_aberto)
-            json_aberto.close()
-                              
+            escreve_ponteiro(relacao_pos_file)
+
     except Exception:
         log_from_logging.exception("falha no pre_filtro, servico=%s", os.path.basename(os.path.dirname(evento)))
 
 # Funções Auxiliares de escrita
+def escreve_ponteiro(relacao_pos_file):
+    print(api_fora)
+    json_aberto = open(path_arquivo_json,"w")
+    json.dump(relacao_pos_file,json_aberto)
+    json_aberto.close()
+
 def soma_mais_um(zera: bool):
     """ Soma sequencial de linhas lidas """
     global qtd
