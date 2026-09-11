@@ -118,7 +118,7 @@ Levantadas em revisão do código, em ordem de severidade.
 - [ ] Corrigir o `compose.yml`: rede única entre `agent` e `api`, bind em `0.0.0.0`, comando do agente e montagem do `.env` e dos diretórios de log
 - [ ] Gravar o `filestate.json` de forma atômica e tolerar o arquivo corrompido na leitura, para um `Ctrl+C` não impedir a próxima execução
 - [X] Validar as variáveis de ambiente dentro do `MiniMim.py`, e não só pelo CLI
-- [ ] Só avançar o ponteiro de leitura depois do envio confirmado pela API
+- [X] Só avançar o ponteiro de leitura depois do envio confirmado pela API
 
 **Altas**
 

@@ -30,7 +30,6 @@ qtd = 0
 batch_de_logs = {}
 ultimo_envio = time.monotonic()
 lock = threading.Lock()
-api_fora = False
 
 # Fecha o lote por tamanho; o que sobrar sai por tempo no --observe.
 TAMANHO_DO_LOTE = 100
@@ -121,12 +120,10 @@ def ler_arquivo(evento):
             # Reposiciona exatamente no fim da ultima linha completa.
             # seek() em modo texto so aceita posicoes vindas de tell(),
             # entao relemos so o trecho completo para obter uma posicao valida.
-            relacao_pos_file[evento] = pos_inicial + len(completo)
+            with lock:
+                relacao_pos_file[evento] = pos_inicial + len(completo)
             servico_do_evento = os.path.basename(os.path.dirname(evento))
-            if pre_filtro(novas_linhas, regras, servico_do_evento) == True:
-                escreve_ponteiro(relacao_pos_file)
-            else:
-                print("Erro de Pre-Filtragem, arquivo não foi salvo, use mincli -l novamente com um ambiente funcional")
+            pre_filtro(novas_linhas, regras, servico_do_evento)
 
     except Exception:
         log_from_logging.exception("falha no pre_filtro, servico=%s", os.path.basename(os.path.dirname(evento)))
@@ -164,10 +161,7 @@ def despacha_lote():
             if envio_para_API(batch_de_logs) == True:
                 clear_batch()
                 soma_mais_um(True)
-                return True
-            else:
-                print("Log nao enviado")
-                return False
+                escreve_ponteiro(relacao_pos_file)
 
     except Exception as e:
         print(f"Depacha_lote, Error={e}")
@@ -186,7 +180,6 @@ def finaliza_envio():
 def pre_filtro(ultimas_linhas, regras, servico_do_evento):
     """Classifica cada linha nova lida do log; o primeiro match (mais especifico) vence."""
     try:
-        despacha_foi = False
         with lock:
             regras_do_servico = regras.get(servico_do_evento)
             if regras_do_servico is None:
@@ -200,13 +193,8 @@ def pre_filtro(ultimas_linhas, regras, servico_do_evento):
                             update_batch(linha, servico_do_evento, regra["id"])
                             soma_mais_um(False)
                             if qtd >= TAMANHO_DO_LOTE:
-                                if despacha_lote() == True:
-                                    despacha_foi = True
+                                despacha_lote()
                             break
-            if despacha_foi == True:
-                return True
-
-
 
     except Exception:
         log_from_logging.exception("falha no pre_filtro, servico=%s", servico_do_evento)
