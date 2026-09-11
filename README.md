@@ -35,7 +35,7 @@ O nome de cada pasta de log precisa bater com a seção correspondente no `filte
 
 ## Como funciona
 
-1. Na inicialização, o `.env` é carregado, o `filter.yaml` é lido e o índice de posições em `JSON_PATH` é restaurado; as regras de cada serviço são compiladas e ordenadas por `especificidade` (maior primeiro).
+1. Na inicialização, o `.env` é carregado, o `filter.yaml` é lido e o índice de posições em `STATE_FILE` é restaurado; as regras de cada serviço são compiladas e ordenadas por `especificidade` (maior primeiro).
 2. O [watchdog](https://pypi.org/project/watchdog/) observa cada diretório listado em `LOG_PATH`. A cada modificação, o agente lê só as linhas novas de cada arquivo e regrava a posição do último `seek` no arquivo de índice, então a leitura continua de onde parou entre execuções.
 3. Cada linha nova é comparada com as regras do serviço deduzido do nome da pasta; o primeiro match — o mais específico — vence.
 4. Cada linha que casa vai para `envio_para_API()`, num POST para o endpoint definido em .env.
@@ -55,10 +55,11 @@ Configure o `.env`:
 ```dotenv
 LOG_PATH = /caminho/para/Apache/,/caminho/para/Openssh/
 CONFIGURATION_FILE = Configuration_Files/filter.yaml
-JSON_PATH = Configuration_Files/filestate.json
+STATE_DIR = Configuration_Files/
+STATE_FILE = Configuration_Files/filestate.json
 ```
 
-`LOG_PATH` é uma lista de diretórios (um por serviço); `CONFIGURATION_FILE` aponta pro `filter.yaml`; `JSON_PATH` é onde o índice de leitura é gravado. O tutorial grava as três.
+`LOG_PATH` é uma lista de diretórios (um por serviço); `CONFIGURATION_FILE` aponta pro `filter.yaml`; `STATE_FILE` é o arquivo onde o índice de leitura é gravado, e `STATE_DIR` é o diretório que o contém (usado pra gravar o índice de forma atômica: escreve num arquivo temporário nesse diretório e troca pelo `STATE_FILE` só no final). O tutorial grava as quatro.
 
 O tutorial interativo monta o `.env` e o `filter.yaml` respondendo perguntas:
 
@@ -116,7 +117,7 @@ Levantadas em revisão do código, em ordem de severidade.
 **Críticas**
 
 - [ ] Corrigir o `compose.yml`: rede única entre `agent` e `api`, bind em `0.0.0.0`, comando do agente e montagem do `.env` e dos diretórios de log
-- [ ] Gravar o `filestate.json` de forma atômica e tolerar o arquivo corrompido na leitura, para um `Ctrl+C` não impedir a próxima execução
+- [X] Gravar o `filestate.json` de forma atômica e tolerar o arquivo corrompido na leitura, para um `Ctrl+C` não impedir a próxima execução
 - [X] Validar as variáveis de ambiente dentro do `MiniMim.py`, e não só pelo CLI
 - [X] Só avançar o ponteiro de leitura depois do envio confirmado pela API
 

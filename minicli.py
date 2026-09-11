@@ -221,12 +221,14 @@ def executa_tutorial():
     set_key(CAMINHO_ENV, "LOG_PATH", ",".join(diretorios))
     set_key(CAMINHO_ENV, "CONFIGURATION_FILE", caminho_de_configuracao)
     caminho_json = "Configuration_Files/filestate.json"
+    diretorio_json = os.path.dirname(caminho_json) or "."
     if not os.path.exists(caminho_json):
-        os.makedirs(os.path.dirname(caminho_json), exist_ok=True)
+        os.makedirs(diretorio_json, exist_ok=True)
         with open(caminho_json, 'w', encoding='utf-8') as arquivo_json:
             json.dump({}, arquivo_json)
         print(f"  + {caminho_json} criado.")
-    set_key(CAMINHO_ENV, "JSON_PATH", caminho_json)
+    set_key(CAMINHO_ENV, "STATE_DIR", diretorio_json)
+    set_key(CAMINHO_ENV, "STATE_FILE", caminho_json)
     set_key(CAMINHO_ENV, "API_URL", "http://127.0.0.1:8000")
     print(f"  + {os.path.abspath(CAMINHO_ENV)} atualizado.")
 
@@ -264,7 +266,7 @@ def main():
 
     log_path = [p for p in (os.getenv('LOG_PATH') or '').split(',') if p.strip()]
     
-    path_arquivo_json = os.getenv('JSON_PATH')
+    arquivo_de_estado = os.getenv('STATE_FILE')
     
     caminho_de_configuracao = os.getenv('CONFIGURATION_FILE')
 
@@ -277,7 +279,7 @@ def main():
 
     if args.load:
         start = time.perf_counter()
-        if not log_path or not path_arquivo_json or not caminho_de_configuracao:
+        if not log_path or not arquivo_de_estado or not caminho_de_configuracao:
             return
         print("Iniciando Coleta de Logs")
         print("=="*40)
@@ -305,7 +307,7 @@ def main():
         return
 
     if args.observe:
-        if not log_path or not path_arquivo_json or not caminho_de_configuracao:
+        if not log_path or not arquivo_de_estado or not caminho_de_configuracao:
             print("Nao configurado, rode: python minicli.py --tutorial")
             return
         else:
@@ -314,8 +316,8 @@ def main():
             return
 
     if args.clean:
-        if path_arquivo_json:
-            json_aberto = open(path_arquivo_json,"w")
+        if arquivo_de_estado:
+            json_aberto = open(arquivo_de_estado,"w")
             json.dump({},json_aberto)
             json_aberto.close()
             print("="*23)

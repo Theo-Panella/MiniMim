@@ -8,22 +8,24 @@ import requests
 import yaml
 import threading
 import portalocker
+import tempfile
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
 load_dotenv()
 
 VARIAVEIS_DE_AMBIENTE = [os.getenv('CONFIGURATION_FILE'), os.getenv('LOG_PATH'),
-                         os.getenv('JSON_PATH'), os.getenv('API_URL')]
+                         os.getenv('STATE_DIR'), os.getenv('API_URL'), os.getenv('STATE_FILE')]
 
 # Checar variaveis de ambiente
 if not all(VARIAVEIS_DE_AMBIENTE):
     print("Erro ao iniciar MiniMim, configure o ambiente usando minicli -t")
-    raise SystemExit() 
+    raise SystemExit()
 
 caminho_de_configuracao = os.getenv('CONFIGURATION_FILE')
 log_path = os.getenv('LOG_PATH').split(',')
-path_arquivo_json = os.getenv('JSON_PATH')
+diretorio_de_estado = os.getenv('STATE_DIR')
+arquivo_de_estado = os.getenv('STATE_FILE')
 log_from_logging = logging.getLogger(__name__)
 url = os.getenv('API_URL')
 qtd = 0
@@ -41,10 +43,14 @@ with portalocker.Lock(caminho_de_configuracao, mode='rb', timeout=1) as arquivo_
     configuracao = yaml.safe_load(arquivo_de_configuracao_puro)
 
 # O indice de leitura e estado local: pode nao existir na primeira execucao.
-if os.path.exists(path_arquivo_json):
-    with open(path_arquivo_json, 'r') as arquivo_json:
-        relacao_pos_file = json.load(arquivo_json)
-else:
+try:
+    if os.path.exists(arquivo_de_estado):
+        with open(arquivo_de_estado, 'r') as arquivo_json:
+            relacao_pos_file = json.load(arquivo_json)
+    else:
+        relacao_pos_file = {}
+except Exception as e:
+    print(f"Arquivo de estado corrompido, reiniciando o indice do zero. Error={e}")
     relacao_pos_file = {}
 
 regras = {
@@ -89,7 +95,7 @@ class MyEventHandler(FileSystemEventHandler):
         # Posicao da ultima leitura: na primeira vez faz a ingestao inicial
         # e depois continua a partir de onde parou.
         self._pos = 0
-        
+
     def on_any_event(self, event: FileSystemEvent) -> None:
         if event.event_type == "modified" and not event.is_directory:
             popula_indice(event.src_path)
@@ -116,7 +122,7 @@ def ler_arquivo(evento):
 
             completo = conteudo[:ultima_quebra + 1]
             novas_linhas = completo.decode("utf-8",errors="replace").splitlines()
-            
+
             # Reposiciona exatamente no fim da ultima linha completa.
             # seek() em modo texto so aceita posicoes vindas de tell(),
             # entao relemos so o trecho completo para obter uma posicao valida.
@@ -130,9 +136,15 @@ def ler_arquivo(evento):
 
 # Funções Auxiliares de escrita
 def escreve_ponteiro(relacao_pos_file):
-    json_aberto = open(path_arquivo_json,"w")
-    json.dump(relacao_pos_file,json_aberto)
-    json_aberto.close()
+    # Grava num arquivo temporario no mesmo diretorio e troca com os.replace,
+    # que e atomico: nunca deixa o arquivo de indice pela metade.
+    with tempfile.NamedTemporaryFile('w', dir=diretorio_de_estado, delete=False) as f_temp:
+        json.dump(relacao_pos_file,f_temp)
+        f_temp.flush()
+        os.fsync(f_temp.fileno())
+
+    os.replace(f_temp.name, arquivo_de_estado)
+
 
 def soma_mais_um(zera: bool):
     """ Soma sequencial de linhas lidas """
@@ -217,7 +229,7 @@ def envio_para_API(batch_de_logs):
 
     except requests.exceptions.ConnectTimeout as error:
         print(f"API timeout, error={error}")
-        
+
     except requests.exceptions.HTTPError as error:
         print(f"API HTTP, error={error}")
 
