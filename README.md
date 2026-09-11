@@ -29,8 +29,6 @@ MiniMim-Agent/
 
 O nome de cada pasta de log precisa bater com a seção correspondente no `filter.yaml` (ex: `Apache/` ↔ `Apache:`) — é assim que o agente escolhe as regras certas para cada arquivo.
 
-> `legacy/MiniMim.py` é a versão original, de um único serviço/arquivo. `MiniMim.py` é a versão atual.
-
 ---
 
 ## Como funciona
