@@ -123,15 +123,16 @@ def ler_arquivo(evento):
             # entao relemos so o trecho completo para obter uma posicao valida.
             relacao_pos_file[evento] = pos_inicial + len(completo)
             servico_do_evento = os.path.basename(os.path.dirname(evento))
-            pre_filtro(novas_linhas, regras, servico_do_evento)
-            escreve_ponteiro(relacao_pos_file)
+            if pre_filtro(novas_linhas, regras, servico_do_evento) == True:
+                escreve_ponteiro(relacao_pos_file)
+            else:
+                print("Erro de Pre-Filtragem, arquivo não foi salvo, use mincli -l novamente com um ambiente funcional")
 
     except Exception:
         log_from_logging.exception("falha no pre_filtro, servico=%s", os.path.basename(os.path.dirname(evento)))
 
 # Funções Auxiliares de escrita
 def escreve_ponteiro(relacao_pos_file):
-    print(api_fora)
     json_aberto = open(path_arquivo_json,"w")
     json.dump(relacao_pos_file,json_aberto)
     json_aberto.close()
@@ -158,10 +159,18 @@ def despacha_lote():
     """ Envia o que estiver acumulado e reinicia o contador e o relogio """
     global ultimo_envio
     ultimo_envio = time.monotonic()
-    if qtd:
-        envio_para_API(batch_de_logs)
-        clear_batch()
-        soma_mais_um(True)
+    try:
+        if qtd:
+            if envio_para_API(batch_de_logs) == True:
+                clear_batch()
+                soma_mais_um(True)
+                return True
+            else:
+                print("Log nao enviado")
+                return False
+
+    except Exception as e:
+        print(f"Depacha_lote, Error={e}")
 
 def envia_sobrando():
     """ Despacha o lote incompleto quando o intervalo vence; chamado pelo observer """
@@ -177,6 +186,7 @@ def finaliza_envio():
 def pre_filtro(ultimas_linhas, regras, servico_do_evento):
     """Classifica cada linha nova lida do log; o primeiro match (mais especifico) vence."""
     try:
+        despacha_foi = False
         with lock:
             regras_do_servico = regras.get(servico_do_evento)
             if regras_do_servico is None:
@@ -190,8 +200,13 @@ def pre_filtro(ultimas_linhas, regras, servico_do_evento):
                             update_batch(linha, servico_do_evento, regra["id"])
                             soma_mais_um(False)
                             if qtd >= TAMANHO_DO_LOTE:
-                                despacha_lote()
+                                if despacha_lote() == True:
+                                    despacha_foi = True
                             break
+            if despacha_foi == True:
+                return True
+
+
 
     except Exception:
         log_from_logging.exception("falha no pre_filtro, servico=%s", servico_do_evento)
@@ -205,11 +220,21 @@ def envio_para_API(batch_de_logs):
     try:
         response = requests.post(url, json=data, headers=headers, timeout=5)
         if response.status_code == 200:
-            return
+            return True
         else:
             print(f"Falha ao enviar, Status code: {response.status_code}")
-    except requests.exceptions.RequestException:
-        log_from_logging.exception("Erro ao enviar log para o centralizador")
+
+    except requests.exceptions.ConnectionError as error:
+        print(f"API fora do ar, error={error}")
+
+    except requests.exceptions.ConnectTimeout as error:
+        print(f"API timeout, error={error}")
+        
+    except requests.exceptions.HTTPError as error:
+        print(f"API HTTP, error={error}")
+
+    #except requests.exceptions.RequestException:
+    #    log_from_logging.exception("Erro ao enviar log para o centralizador")
 
 if __name__ == "__main__":
     cria_observer()
