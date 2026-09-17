@@ -7,3 +7,4 @@ cli.egg-info/
 *.log
 gunicorn.ctl
 Configuration_Files/filestate.json
+Configuration_Files/API_SS.json

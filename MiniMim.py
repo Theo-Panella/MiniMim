@@ -211,11 +211,22 @@ def pre_filtro(ultimas_linhas, regras, servico_do_evento):
     except Exception:
         log_from_logging.exception("falha no pre_filtro, servico=%s", servico_do_evento)
 
+def salvar_logs(apifile_path,api_SS):
+    with tempfile.NamedTemporaryFile(mode="a", dir=apifile_path,delete=False) as f_temp:
+            json.dump(batch_de_logs,f_temp)
+            f_temp.flush()
+            os.fsync(f_temp.fileno())
+    os.replace(f_temp.name, apifile_path+api_SS)
+    print("=="*40)
+    print("Os logs filtrados foram salvos e estão arquivados")
+    print("rode [minili -sta] para enviar para api quando estiver online")
 
 def envio_para_API(batch_de_logs):
     """Envia o log classificado para o centralizador."""
     headers = {"Content-Type": "application/json"}
     data = {"batch": batch_de_logs}
+    apifile_path = "Configuration_Files/"
+    api_SS = "API_SS.json" # API Save State.json
 
     try:
         response = requests.post(url, json=data, headers=headers, timeout=5)
@@ -223,15 +234,11 @@ def envio_para_API(batch_de_logs):
             return True
         else:
             print(f"Falha ao enviar, Status code: {response.status_code}")
-
+            salvar_logs(apifile_path,api_SS)
+    
     except requests.exceptions.ConnectionError as error:
         print(f"API fora do ar, error={error}")
-
-    except requests.exceptions.ConnectTimeout as error:
-        print(f"API timeout, error={error}")
-
-    except requests.exceptions.HTTPError as error:
-        print(f"API HTTP, error={error}")
+        salvar_logs(apifile_path,api_SS)
 
     #except requests.exceptions.RequestException:
     #    log_from_logging.exception("Erro ao enviar log para o centralizador")

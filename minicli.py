@@ -261,6 +261,7 @@ def main():
     parser.add_argument('-l','--load', action='store_true', help="Faz a carga inicial dos arquivos nos diretorios definidos no .env")
     parser.add_argument('-o','--observe', action='store_true', help="Inicia a observacao continua dos diretorios de log")
     parser.add_argument('-c','--clean', action='store_true', help="Limpa o arquivo do ponteiro de leitura")
+    parser.add_argument('-sta','--sendtoapi', action='store_true', help="Envia batchs salvas para API")
 
     args = parser.parse_args()
 
@@ -326,6 +327,16 @@ def main():
         else:
             print("Arquivo .json não localizado")
             return
+
+    if args.sendtoapi:
+        apifile_path = "Configuration_Files/"
+        api_SS = "API_SS.json" # API Save State.json
+        try:
+            with open(apifile_path+api_SS,"r") as apifile_SS:
+                linhas = apifile_SS.readlines()
+                print(linhas)
+        except:
+            print(A)
 
     else:
         parser.print_help()

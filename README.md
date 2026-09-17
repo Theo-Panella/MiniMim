@@ -121,7 +121,7 @@ Levantadas em revisão do código, em ordem de severidade.
 
 **Altas**
 
-- [ ] Não persistir a posição de leitura quando o `pre_filtro` levanta exceção
+- [X] Não persistir a posição de leitura quando o `pre_filtro` levanta exceção
 - [ ] Não avançar o ponteiro de um serviço que ainda não tem regras no `filter.yaml`
-- [ ] Respeitar o lote de 100 no `--observe`, sem despachar a cada evento multilinha
+- [X] Respeitar o lote de 100 no `--observe`, sem despachar a cada evento multilinha
 - [ ] Enviar para a API fora do lock, para não travar a thread do watchdog por até 5s
