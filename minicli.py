@@ -335,8 +335,8 @@ def main():
             with open(apifile_path+api_SS,"r") as apifile_SS:
                 linhas = apifile_SS.readlines()
                 print(linhas)
-        except:
-            print(A)
+        except Exception as erro:
+            print(erro)
 
     else:
         parser.print_help()

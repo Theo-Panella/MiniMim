@@ -212,14 +212,23 @@ def pre_filtro(ultimas_linhas, regras, servico_do_evento):
         log_from_logging.exception("falha no pre_filtro, servico=%s", servico_do_evento)
 
 def salvar_logs(apifile_path,api_SS):
-    with tempfile.NamedTemporaryFile(mode="a", dir=apifile_path,delete=False) as f_temp:
+    with open(apifile_path+api_SS, "r") as apifile_SS:
+            linhas_do_apifile_SS = apifile_SS.readlines()
+            dict(linhas_do_apifile_SS)
+
+    print(batch_de_logs)
+    print(linhas_do_apifile_SS[0])
+    if batch_de_logs not in linhas_do_apifile_SS[0]:
+        with tempfile.NamedTemporaryFile(mode="a", dir=apifile_path,delete=False) as f_temp:
+            os.fsync(f_temp.fileno())
             json.dump(batch_de_logs,f_temp)
             f_temp.flush()
-            os.fsync(f_temp.fileno())
-    os.replace(f_temp.name, apifile_path+api_SS)
-    print("=="*40)
-    print("Os logs filtrados foram salvos e estão arquivados")
-    print("rode [minili -sta] para enviar para api quando estiver online")
+        os.replace(f_temp.name, apifile_path+api_SS)
+        print("=="*40)
+        print("Os logs filtrados foram salvos e estão arquivados")
+        print("rode [minili -sta] para enviar para api quando estiver online")
+    else:
+        print("batch ja cadastrada")
 
 def envio_para_API(batch_de_logs):
     """Envia o log classificado para o centralizador."""
