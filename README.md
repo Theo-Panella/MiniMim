@@ -22,7 +22,9 @@ MiniMim-Agent/
 ├── Configuration_Files/
 │   ├── filter.yaml            # regras de filtragem, uma seção por serviço
 │   └── filestate.json         # índice de leitura por arquivo, versionado vazio
-├── Apache/, Openssh/          # pastas de log de amostra, uma por serviço
+├── Log_paths/
+│   ├── Apache/                # pastas de log de amostra, uma por serviço
+│   └── Openssh/
 ├── escreve_log_teste.py       # gera linhas de log continuamente, pra teste
 └── .env                       # configuração local (não versionado)
 ```
@@ -94,6 +96,26 @@ gunicorn --bind 127.0.0.1:8000 api:app                # Linux
 
 ---
 
+## Docker
+
+```bash
+docker compose up -d --build
+```
+
+Sobe `api` (porta `8000` exposta no host) e `agent` (só fica de pé com `sleep infinity`, sem coletar nada ainda). O diretório `Log_paths/` do host é montado como bind mount somente leitura em `/app/Log_paths` dentro do `agent`, então qualquer log novo escrito ali aparece no container em tempo real.
+
+Configure o agente de dentro do container — os caminhos detectados pelo tutorial já batem com o filesystem do container:
+
+```bash
+docker compose exec agent python minicli.py -t
+docker compose exec agent python minicli.py -l   # carga inicial
+docker compose exec agent python minicli.py -o   # observação contínua
+```
+
+O `.env` gerado fica na camada gravável do container: some se ele for recriado, então o tutorial precisa rodar de novo depois de um `--build`/`down`.
+
+---
+
 ## Roadmap
 
 - [x] Envio da linha classificada para uma API central
@@ -114,7 +136,7 @@ Levantadas em revisão do código, em ordem de severidade.
 
 **Críticas**
 
-- [ ] Corrigir o `compose.yml`: rede única entre `agent` e `api`, bind em `0.0.0.0`, comando do agente e montagem do `.env` e dos diretórios de log
+- [X] Corrigir o `compose.yml`: rede única entre `agent` e `api`, bind em `0.0.0.0`, comando do agente e montagem dos diretórios de log
 - [X] Gravar o `filestate.json` de forma atômica e tolerar o arquivo corrompido na leitura, para um `Ctrl+C` não impedir a próxima execução
 - [X] Validar as variáveis de ambiente dentro do `MiniMim.py`, e não só pelo CLI
 - [X] Só avançar o ponteiro de leitura depois do envio confirmado pela API
