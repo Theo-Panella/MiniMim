@@ -1,6 +1,9 @@
 services:
   api:
     build: .
+    networks:
+      - public
+      - iso
     ports:
       - 8000:8000
 
@@ -8,10 +11,19 @@ services:
 
   agent:
     build: .
+    networks:
+      - iso
     volumes:
-      - Log_paths:/app/Log_paths:ro
+      - ./Log_paths:/app/Log_paths:ro
+      - .env:/app/.env
+    depends_on:
+      - api
+    
+    command: sleep infinity
 
-    command: echo "Agente está de pé, QUE COMECE A CAÇA DE LOGS!"
+networks:
+  iso:
+    internal: true
+  public:
 
-volumes:
-  Log_paths:
+

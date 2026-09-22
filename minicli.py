@@ -148,8 +148,10 @@ def executa_tutorial():
     print("Este tutorial monta o .env e o filter.yaml respondendo algumas perguntas.")
     print("Enter aceita o valor entre colchetes. Ctrl+C cancela sem gravar nada.")
 
+    titulo("1/4 - Arquivo de regras")
+
     # ---- 1. arquivo de regras ---------------------------------------------
-    titulo("1/3 - Arquivo de regras")
+    titulo("1/4 - Arquivo de regras")
     atual = os.getenv('CONFIGURATION_FILE') or CONFIGURACAO_PADRAO
     caminho_de_configuracao = os.path.abspath(
         os.path.expanduser(pergunta("Caminho do filter.yaml", padrao=atual)))
@@ -161,7 +163,7 @@ def executa_tutorial():
         print("  Arquivo novo - sera criado ao final do tutorial.")
 
     # ---- 2. diretorios de log ---------------------------------------------
-    titulo("2/3 - Diretorios de log")
+    titulo("2/4 - Diretorios de log")
     print("Cada diretorio corresponde a um servico. O nome da pasta escolhe a")
     print("secao de regras usada na filtragem (ex: Apache/ -> Apache:).")
 
@@ -199,8 +201,13 @@ def executa_tutorial():
         servico = pergunta("  Nome do servico", padrao=servico_padrao)
         configuracao[servico] = coleta_regras(servico, configuracao.get(servico))
 
-    # ---- 3. resumo e gravacao ---------------------------------------------
-    titulo("3/3 - Resumo")
+    # ---- 3. endereço da API ---------------------------------------------
+    titulo("3/4 - endereço da API")
+    endereco_api = pergunta("\n  Endereço da API - http://[Endereço]:8000", padrao="127.0.0.1")
+
+
+    # ---- 4. resumo e gravacao ---------------------------------------------
+    titulo("4/4 - Resumo")
     print(f"Arquivo de regras : {caminho_de_configuracao}")
     print("Diretorios        :")
     for diretorio in diretorios:
@@ -229,7 +236,7 @@ def executa_tutorial():
         print(f"  + {caminho_json} criado.")
     set_key(CAMINHO_ENV, "STATE_DIR", diretorio_json)
     set_key(CAMINHO_ENV, "STATE_FILE", caminho_json)
-    set_key(CAMINHO_ENV, "API_URL", "http://127.0.0.1:8000")
+    set_key(CAMINHO_ENV, "API_URL", f"http://{endereco_api}:8000")
     print(f"  + {os.path.abspath(CAMINHO_ENV)} atualizado.")
 
     print("\nPronto. Proximos passos:")
@@ -337,8 +344,8 @@ def main():
                 linhas = apifile_SS.readlines()
                 print(linhas)
                 return
-        except Exception as error:
-            print(error)
+        except Exception as erro:
+            print(erro)
 
     else:
         parser.print_help()
