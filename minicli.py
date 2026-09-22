@@ -324,6 +324,7 @@ def main():
             print("="*23)
             print("= Arquivo .json limpo =")
             print("="*23)
+            return
         else:
             print("Arquivo .json não localizado")
             return
@@ -335,8 +336,9 @@ def main():
             with open(apifile_path+api_SS,"r") as apifile_SS:
                 linhas = apifile_SS.readlines()
                 print(linhas)
-        except:
-            print(A)
+                return
+        except Exception as error:
+            print(error)
 
     else:
         parser.print_help()

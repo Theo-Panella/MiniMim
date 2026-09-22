@@ -240,8 +240,9 @@ def envio_para_API(batch_de_logs):
         print(f"API fora do ar, error={error}")
         salvar_logs(apifile_path,api_SS)
 
-    #except requests.exceptions.RequestException:
-    #    log_from_logging.exception("Erro ao enviar log para o centralizador")
-
+    except requests.exceptions.RequestException:
+        print(f"API fora do ar, error={error}")
+        salvar_logs(apifile_path,api_SS)
+        
 if __name__ == "__main__":
     cria_observer()
