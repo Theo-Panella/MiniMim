@@ -253,8 +253,17 @@ def executa_tutorial():
 # Reenvio dos lotes salvos
 # --------------------------------------------------------------------------- #
 
+def grava_lotes_pendentes(apifile_path, caminho_completo, lotes_pendentes):
+    """Regrava o arquivo de lotes pendentes de forma atomica."""
+    with tempfile.NamedTemporaryFile(mode="w", dir=apifile_path, delete=False) as f_temp:
+        json.dump(lotes_pendentes, f_temp)
+        f_temp.flush()
+        os.fsync(f_temp.fileno())
+    os.replace(f_temp.name, caminho_completo)
+
+
 def envia_lotes_pendentes(apifile_path, api_SS):
-    """Reenvia para a API os lotes salvos em disco; mantem so os que ainda falharem."""
+    """Reenvia para a API os lotes salvos em disco, tirando cada um do arquivo assim que despachado."""
     caminho_completo = apifile_path + api_SS
     url = os.getenv('API_URL')
 
@@ -268,48 +277,46 @@ def envia_lotes_pendentes(apifile_path, api_SS):
 
     try:
         with portalocker.Lock(caminho_completo, mode='rb', timeout=1) as apifile_SS:
-            lotes_salvos = json.load(apifile_SS)
+            lotes_pendentes = json.load(apifile_SS)
     except json.JSONDecodeError as erro:
         print(f"Arquivo de lotes com erro: {erro}")
         return
 
-    if not isinstance(lotes_salvos, list):
+    if not isinstance(lotes_pendentes, list):
         print("Arquivo de lotes em formato antigo/invalido, nada para enviar.")
         return
 
-    if not lotes_salvos:
+    if not lotes_pendentes:
         print("Nenhum lote para enviar.")
         return
 
     headers = {"Content-Type": "application/json"}
-    lotes_restantes = []
     enviados = 0
 
-    for indice, lote in enumerate(lotes_salvos):
+    # Itera sobre uma copia: cada lote enviado com sucesso sai de lotes_pendentes
+    # e o arquivo e regravado na hora, entao uma interrupcao no meio do laco
+    # nao reenvia de novo o que ja foi despachado.
+    for lote in list(lotes_pendentes):
         try:
             response = requests.post(url, json={"batch": lote}, headers=headers, timeout=5)
-            if response.status_code == 200:
-                enviados += 1
-            else:
-                print(f"Falha ao enviar, status code: {response.status_code}")
-                lotes_restantes.append(lote)
         except requests.exceptions.ConnectionError as erro:
             print(f"API fora do ar, error={erro}")
             # Sem conexao com a API agora, os lotes seguintes tambem vao falhar.
-            lotes_restantes.extend(lotes_salvos[indice:])
             break
         except requests.exceptions.RequestException as erro:
             print(f"Erro ao enviar, error={erro}")
-            lotes_restantes.append(lote)
+            continue
 
-    with tempfile.NamedTemporaryFile(mode="w", dir=apifile_path, delete=False) as f_temp:
-        json.dump(lotes_restantes, f_temp)
-        f_temp.flush()
-        os.fsync(f_temp.fileno())
-    os.replace(f_temp.name, caminho_completo)
+        if response.status_code != 200:
+            print(f"Falha ao enviar, status code: {response.status_code}")
+            continue
+
+        enviados += 1
+        lotes_pendentes.remove(lote)
+        grava_lotes_pendentes(apifile_path, caminho_completo, lotes_pendentes)
 
     print("=="*40)
-    print(f"{enviados} lote(s) enviado(s), {len(lotes_restantes)} ainda pendente(s)")
+    print(f"{enviados} lote(s) enviado(s), {len(lotes_pendentes)} ainda pendente(s)")
 
 
 # --------------------------------------------------------------------------- #
