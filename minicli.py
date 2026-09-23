@@ -230,17 +230,27 @@ def executa_tutorial():
         open(CAMINHO_ENV, 'w', encoding='utf-8').close()
     set_key(CAMINHO_ENV, "LOG_PATH", ",".join(diretorios))
     set_key(CAMINHO_ENV, "CONFIGURATION_FILE", caminho_de_configuracao)
-    caminho_json = "Configuration_Files/filestate.json"
-    diretorio_json = os.path.dirname(caminho_json) or "."
-    if not os.path.exists(caminho_json):
+
+    caminho_json_state = "Configuration_Files/filestate.json"
+    caminho_json_API = "Configuration_Files/API_SS.json"
+    diretorio_json = os.path.dirname(caminho_json_state) or "."
+
+    if not os.path.exists(caminho_json_state):
+
         os.makedirs(diretorio_json, exist_ok=True)
-        with open(caminho_json, 'w', encoding='utf-8') as arquivo_json:
+        with open(caminho_json_state, 'w', encoding='utf-8') as arquivo_json:
             json.dump({}, arquivo_json)
-        print(f"  + {caminho_json} criado.")
+        print(f"  + {caminho_json_state} criado.")
+
+    # Nao sobrescreve: o arquivo pode ter lotes pendentes de reenvio.
+    if not os.path.exists(caminho_json_API):
+        with open(caminho_json_API, 'w', encoding='utf-8') as arquivo_estado_api:
+            json.dump([], arquivo_estado_api)
+
     set_key(CAMINHO_ENV, "STATE_DIR", diretorio_json)
-    set_key(CAMINHO_ENV, "STATE_FILE", caminho_json)
+    set_key(CAMINHO_ENV, "STATE_FILE", caminho_json_state)
     set_key(CAMINHO_ENV, "API_URL", f"http://{endereco_api}:8000")
-    set_key(CAMINHO_ENV, "API_FILE_PATH", f"/app/Configuration_Files/")
+    set_key(CAMINHO_ENV, "API_FILE_PATH", f"{diretorio_json}/")
     set_key(CAMINHO_ENV, "API_SS_FILE", f"API_SS.json")
     print(f"  + {os.path.abspath(CAMINHO_ENV)} atualizado.")
 

@@ -11,16 +11,22 @@ services:
 
   agent:
     build: .
+    develop:
+      watch:
+        - action: sync
+          path: ./Log_paths
+          target: /app/Log_paths
     networks:
       - iso
     volumes:
-      - ./Log_paths:/app/Log_paths:ro
+      - ./Configuration_Files:/app/Configuration_Files:rw
     env_file:
       - .env
     depends_on:
       - api
-    
-    command: sh -c "minicli -l && minicli -o"
+
+
+    command: sleep infinity
 
 networks:
   iso:

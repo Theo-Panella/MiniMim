@@ -94,7 +94,7 @@ Reenvia pra API os lotes que falharam o envio e ficaram salvos localmente (em `A
 python minicli.py -sta
 ```
 
-`escreve_log_teste.py` gera linhas de teste continuamente em `Openssh/OpenSSH_2k.log`, útil pra ver o watchdog reagir. Encerre qualquer processo com `Ctrl+C`.
+`Log_paths/` não é versionado (`*.log` está no `.gitignore`), então num clone novo não há logs de amostra. `escreve_log_teste.py` cria `Log_paths/Openssh/OpenSSH_2k.log` e gera linhas de teste continuamente nele, útil pra ver o watchdog reagir (rode da raiz do projeto). Encerre qualquer processo com `Ctrl+C`.
 
 A API que recebe os logs precisa estar de pé antes da coleta. O `gunicorn` só roda em Linux — ele importa `fcntl` —, então no Windows use o `waitress`:
 
@@ -111,15 +111,9 @@ gunicorn --bind 127.0.0.1:8000 api:app                # Linux
 docker compose up -d --build
 ```
 
-Sobe `api` (porta `8000` exposta no host) e `agent`, que faz a carga inicial (`minicli -l`) e emenda direto na observação contínua (`minicli -o`), ficando de pé. O `agent` só fica na rede `iso`, interna — ele fala com a `api` pelo nome do serviço (`http://api:8000`), não por `127.0.0.1`. O diretório `Log_paths/` do host é montado como bind mount somente leitura em `/app/Log_paths` dentro do `agent`, então qualquer log novo escrito ali aparece no container em tempo real.
+Sobe `api` (porta `8000` exposta no host) e `agent`, que fica de pé com `sleep infinity` sem coletar nada sozinho: a coleta é disparada com `docker compose exec` (abaixo). O `agent` só fica na rede `iso`, interna — ele fala com a `api` pelo nome do serviço (`http://api:8000`), não por `127.0.0.1`. O `Log_paths/` do host **não** é um bind mount: no Docker Desktop o `inotify` não recebe eventos de escritas feitas no host através dele, e o `minicli -o` nunca reagiria. Em vez disso o `compose.yml` usa o Compose Watch (`develop.watch`, ação `sync`), que copia os logs alterados do host para `/app/Log_paths` dentro do container. Sem o `watch` rodando nada é sincronizado: o container só tem a cópia que entrou na imagem no build, e num clone novo ela é vazia.
 
-O `.env` **não** é gerado dentro do container: rode o tutorial no host antes de subir o compose...
-
-```bash
-python minicli.py -t
-```
-
-...e o `env_file: .env` do `compose.yml` injeta essas variáveis no `agent` na subida. Como o tutorial hoje grava caminhos locais, ajuste manualmente no `.env` os que precisam apontar pro filesystem do container (prefixo `/app/`), por exemplo:
+O `.env` **não** é gerado dentro do container e o `compose.yml` falha se ele não existir no host. Rode o tutorial no host antes de subir (`python minicli.py -t`); o `env_file: .env` do `compose.yml` injeta as variáveis no `agent` na subida. Como o tutorial grava caminhos do host, ajuste manualmente no `.env` os que precisam apontar pro filesystem do container (prefixo `/app/`), por exemplo:
 
 ```dotenv
 LOG_PATH = /app/Log_paths/Apache,/app/Log_paths/Openssh
@@ -128,12 +122,26 @@ API_URL = http://api:8000
 API_FILE_PATH = /app/Configuration_Files/
 ```
 
-O `agent` já fica observando sozinho depois do `up`; pra rodar outro comando pontualmente (reenvio dos lotes pendentes, limpeza do índice, etc.), use `exec` no container que já está de pé:
+Como `Log_paths/` não é versionado, crie as pastas (`Log_paths/Apache`, `Log_paths/Openssh`) com alguns logs antes de subir.
+
+Em um terminal, deixe o `watch` rodando (ele fica em primeiro plano e recria o `agent` ao iniciar):
 
 ```bash
-docker compose exec agent minicli -sta
-docker compose exec agent minicli -c
+docker compose watch
 ```
+
+Espere a mensagem `Watch enabled` e, em outro terminal, dispare a coleta e os demais comandos com `exec`. Não use `exec` antes disso: o `agent` é recriado e o comando morre junto.
+
+```bash
+docker compose exec agent minicli -l     # carga inicial
+docker compose exec agent minicli -o     # observação contínua (Ctrl+C encerra)
+docker compose exec agent minicli -sta   # reenvia lotes pendentes
+docker compose exec agent minicli -c     # limpa o ponteiro de leitura
+```
+
+Com o `watch` ativo, logs novos ou apendados no `Log_paths/` do host chegam ao `-o` e vão para a API.
+
+`Configuration_Files/` é montado do host em `/app/Configuration_Files` (leitura e escrita), então o `filter.yaml`, o `filestate.json` e os lotes pendentes em `API_SS.json` sobrevivem a `down`/`--build`.
 
 ---
 
