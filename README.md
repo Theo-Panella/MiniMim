@@ -111,7 +111,7 @@ gunicorn --bind 127.0.0.1:8000 api:app                # Linux
 docker compose up -d --build
 ```
 
-Sobe `api` (porta `8000` exposta no host) e `agent`, que roda `minicli -l` (carga inicial) e encerra. O `agent` só fica na rede `iso`, interna — ele fala com a `api` pelo nome do serviço (`http://api:8000`), não por `127.0.0.1`. O diretório `Log_paths/` do host é montado como bind mount somente leitura em `/app/Log_paths` dentro do `agent`, então qualquer log novo escrito ali aparece no container em tempo real.
+Sobe `api` (porta `8000` exposta no host) e `agent`, que faz a carga inicial (`minicli -l`) e emenda direto na observação contínua (`minicli -o`), ficando de pé. O `agent` só fica na rede `iso`, interna — ele fala com a `api` pelo nome do serviço (`http://api:8000`), não por `127.0.0.1`. O diretório `Log_paths/` do host é montado como bind mount somente leitura em `/app/Log_paths` dentro do `agent`, então qualquer log novo escrito ali aparece no container em tempo real.
 
 O `.env` **não** é gerado dentro do container: rode o tutorial no host antes de subir o compose...
 
@@ -128,11 +128,11 @@ API_URL = http://api:8000
 API_FILE_PATH = /app/Configuration_Files/
 ```
 
-Pra rodar outro comando pontualmente (observação contínua, reenvio pendente, etc.), use `exec` num container já de pé ou `run` pra um descartável:
+O `agent` já fica observando sozinho depois do `up`; pra rodar outro comando pontualmente (reenvio dos lotes pendentes, limpeza do índice, etc.), use `exec` no container que já está de pé:
 
 ```bash
-docker compose exec agent minicli -o     # se o agent ainda estiver rodando
-docker compose run --rm agent minicli -sta
+docker compose exec agent minicli -sta
+docker compose exec agent minicli -c
 ```
 
 ---

@@ -20,7 +20,7 @@ services:
     depends_on:
       - api
     
-    command: minicli -l
+    command: sh -c "minicli -l && minicli -o"
 
 networks:
   iso:
