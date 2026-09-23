@@ -3,9 +3,12 @@ import argparse
 import os
 import re
 import json
+import tempfile
 
 import yaml
 import time
+import portalocker
+import requests
 from dotenv import load_dotenv, set_key
 from rich.progress import Progress, MofNCompleteColumn, TextColumn, BarColumn, TimeRemainingColumn
 
@@ -237,11 +240,76 @@ def executa_tutorial():
     set_key(CAMINHO_ENV, "STATE_DIR", diretorio_json)
     set_key(CAMINHO_ENV, "STATE_FILE", caminho_json)
     set_key(CAMINHO_ENV, "API_URL", f"http://{endereco_api}:8000")
+    set_key(CAMINHO_ENV, "API_FILE_PATH", f"/app/Configuration_Files/")
+    set_key(CAMINHO_ENV, "API_SS_FILE", f"API_SS.json")
     print(f"  + {os.path.abspath(CAMINHO_ENV)} atualizado.")
 
     print("\nPronto. Proximos passos:")
     print("  minicli --load  # carga inicial dos logs existentes")
     print("  minicli --observe   # monitoramento continuo")
+
+
+# --------------------------------------------------------------------------- #
+# Reenvio dos lotes salvos
+# --------------------------------------------------------------------------- #
+
+def envia_lotes_pendentes(apifile_path, api_SS):
+    """Reenvia para a API os lotes salvos em disco; mantem so os que ainda falharem."""
+    caminho_completo = apifile_path + api_SS
+    url = os.getenv('API_URL')
+
+    if not url:
+        print("API_URL nao configurada, rode: python minicli.py --tutorial")
+        return
+
+    if not os.path.exists(caminho_completo):
+        print("Nenhum lote pendente para enviar.")
+        return
+
+    try:
+        with portalocker.Lock(caminho_completo, mode='rb', timeout=1) as apifile_SS:
+            lotes_salvos = json.load(apifile_SS)
+    except json.JSONDecodeError as erro:
+        print(f"Arquivo de lotes com erro: {erro}")
+        return
+
+    if not isinstance(lotes_salvos, list):
+        print("Arquivo de lotes em formato antigo/invalido, nada para enviar.")
+        return
+
+    if not lotes_salvos:
+        print("Nenhum lote para enviar.")
+        return
+
+    headers = {"Content-Type": "application/json"}
+    lotes_restantes = []
+    enviados = 0
+
+    for indice, lote in enumerate(lotes_salvos):
+        try:
+            response = requests.post(url, json={"batch": lote}, headers=headers, timeout=5)
+            if response.status_code == 200:
+                enviados += 1
+            else:
+                print(f"Falha ao enviar, status code: {response.status_code}")
+                lotes_restantes.append(lote)
+        except requests.exceptions.ConnectionError as erro:
+            print(f"API fora do ar, error={erro}")
+            # Sem conexao com a API agora, os lotes seguintes tambem vao falhar.
+            lotes_restantes.extend(lotes_salvos[indice:])
+            break
+        except requests.exceptions.RequestException as erro:
+            print(f"Erro ao enviar, error={erro}")
+            lotes_restantes.append(lote)
+
+    with tempfile.NamedTemporaryFile(mode="w", dir=apifile_path, delete=False) as f_temp:
+        json.dump(lotes_restantes, f_temp)
+        f_temp.flush()
+        os.fsync(f_temp.fileno())
+    os.replace(f_temp.name, caminho_completo)
+
+    print("=="*40)
+    print(f"{enviados} lote(s) enviado(s), {len(lotes_restantes)} ainda pendente(s)")
 
 
 # --------------------------------------------------------------------------- #
@@ -337,15 +405,10 @@ def main():
             return
 
     if args.sendtoapi:
-        apifile_path = "Configuration_Files/"
-        api_SS = "API_SS.json" # API Save State.json
-        try:
-            with open(apifile_path+api_SS,"r") as apifile_SS:
-                linhas = apifile_SS.readlines()
-                print(linhas)
-                return
-        except Exception as erro:
-            print(erro)
+        apifile_path = os.getenv('API_FILE_PATH', 'Configuration_Files/')
+        api_SS = os.getenv('API_SS_FILE', 'API_SS.json') # API Save State.json
+        envia_lotes_pendentes(apifile_path, api_SS)
+        return
 
     else:
         parser.print_help()

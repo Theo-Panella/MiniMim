@@ -28,6 +28,8 @@ diretorio_de_estado = os.getenv('STATE_DIR')
 arquivo_de_estado = os.getenv('STATE_FILE')
 log_from_logging = logging.getLogger(__name__)
 url = os.getenv('API_URL')
+apifile_path = os.getenv('API_FILE_PATH', 'Configuration_Files/')
+api_SS = os.getenv('API_SS_FILE', 'API_SS.json')
 qtd = 0
 batch_de_logs = {}
 ultimo_envio = time.monotonic()
@@ -212,30 +214,45 @@ def pre_filtro(ultimas_linhas, regras, servico_do_evento):
         log_from_logging.exception("falha no pre_filtro, servico=%s", servico_do_evento)
 
 def salvar_logs(apifile_path,api_SS):
-    with open(apifile_path+api_SS, "r") as apifile_SS:
-            linhas_do_apifile_SS = apifile_SS.readlines()
-            dict(linhas_do_apifile_SS)
+    """Acrescenta a batch atual ao arquivo de lotes pendentes, sem duplicar a mesma batch."""
+    caminho_completo = apifile_path + api_SS
 
-    print(batch_de_logs)
-    print(linhas_do_apifile_SS[0])
-    if batch_de_logs not in linhas_do_apifile_SS[0]:
-        with tempfile.NamedTemporaryFile(mode="a", dir=apifile_path,delete=False) as f_temp:
-            os.fsync(f_temp.fileno())
-            json.dump(batch_de_logs,f_temp)
-            f_temp.flush()
-        os.replace(f_temp.name, apifile_path+api_SS)
-        print("=="*40)
-        print("Os logs filtrados foram salvos e estão arquivados")
-        print("rode [minili -sta] para enviar para api quando estiver online")
+    # JSON so aceita chaves string: normaliza a batch pelo mesmo caminho antes de comparar,
+    # senao as chaves inteiras nunca batem com o que foi lido do disco.
+    batch_normalizada = json.loads(json.dumps(batch_de_logs))
+
+    if os.path.exists(caminho_completo):
+        try:
+            with portalocker.Lock(caminho_completo, mode='rb', timeout=1) as apifile_SS:
+                lotes_salvos = json.load(apifile_SS)
+        except json.JSONDecodeError:
+            lotes_salvos = []
+        if not isinstance(lotes_salvos, list):
+            # Formato antigo (um unico lote salvo como dict): descarta e comeca a lista do zero.
+            lotes_salvos = []
     else:
+        lotes_salvos = []
+
+    if batch_normalizada in lotes_salvos:
         print("batch ja cadastrada")
+        return
+
+    lotes_salvos.append(batch_normalizada)
+
+    with tempfile.NamedTemporaryFile(mode="w", dir=apifile_path, delete=False) as f_temp:
+        json.dump(lotes_salvos, f_temp)
+        f_temp.flush()
+        os.fsync(f_temp.fileno())
+    os.replace(f_temp.name, caminho_completo)
+
+    print("=="*40)
+    print("Os logs filtrados foram salvos e estão arquivados")
+    print("rode [minicli -sta] para enviar para api quando estiver online")
 
 def envio_para_API(batch_de_logs):
     """Envia o log classificado para o centralizador."""
     headers = {"Content-Type": "application/json"}
     data = {"batch": batch_de_logs}
-    apifile_path = "Configuration_Files/"
-    api_SS = "API_SS.json" # API Save State.json
 
     try:
         response = requests.post(url, json=data, headers=headers, timeout=5)
@@ -244,12 +261,12 @@ def envio_para_API(batch_de_logs):
         else:
             print(f"Falha ao enviar, Status code: {response.status_code}")
             salvar_logs(apifile_path,api_SS)
-    
+
     except requests.exceptions.ConnectionError as error:
         print(f"API fora do ar, error={error}")
         salvar_logs(apifile_path,api_SS)
 
-    except requests.exceptions.RequestException:
+    except requests.exceptions.RequestException as error:
         print(f"API fora do ar, error={error}")
         salvar_logs(apifile_path,api_SS)
         

@@ -57,9 +57,12 @@ LOG_PATH = /caminho/para/Apache/,/caminho/para/Openssh/
 CONFIGURATION_FILE = Configuration_Files/filter.yaml
 STATE_DIR = Configuration_Files/
 STATE_FILE = Configuration_Files/filestate.json
+API_URL = http://127.0.0.1:8000
+API_FILE_PATH = Configuration_Files/
+API_SS_FILE = API_SS.json
 ```
 
-`LOG_PATH` é uma lista de diretórios (um por serviço); `CONFIGURATION_FILE` aponta pro `filter.yaml`; `STATE_FILE` é o arquivo onde o índice de leitura é gravado, e `STATE_DIR` é o diretório que o contém (usado pra gravar o índice de forma atômica: escreve num arquivo temporário nesse diretório e troca pelo `STATE_FILE` só no final). O tutorial grava as quatro.
+`LOG_PATH` é uma lista de diretórios (um por serviço); `CONFIGURATION_FILE` aponta pro `filter.yaml`; `STATE_FILE` é o arquivo onde o índice de leitura é gravado, e `STATE_DIR` é o diretório que o contém (usado pra gravar o índice de forma atômica: escreve num arquivo temporário nesse diretório e troca pelo `STATE_FILE` só no final). `API_URL` é o endereço do centralizador (`api.py`). `API_FILE_PATH`/`API_SS_FILE` apontam pro arquivo onde ficam os lotes que falharam o envio, pendentes de reenvio. O tutorial grava todas.
 
 O tutorial interativo monta o `.env` e o `filter.yaml` respondendo perguntas:
 
@@ -85,6 +88,12 @@ Limpa o ponteiro de leitura:
 python minicli.py -c
 ```
 
+Reenvia pra API os lotes que falharam o envio e ficaram salvos localmente (em `API_FILE_PATH`/`API_SS_FILE`):
+
+```bash
+python minicli.py -sta
+```
+
 `escreve_log_teste.py` gera linhas de teste continuamente em `Openssh/OpenSSH_2k.log`, útil pra ver o watchdog reagir. Encerre qualquer processo com `Ctrl+C`.
 
 A API que recebe os logs precisa estar de pé antes da coleta. O `gunicorn` só roda em Linux — ele importa `fcntl` —, então no Windows use o `waitress`:
@@ -102,17 +111,29 @@ gunicorn --bind 127.0.0.1:8000 api:app                # Linux
 docker compose up -d --build
 ```
 
-Sobe `api` (porta `8000` exposta no host) e `agent` (só fica de pé com `sleep infinity`, sem coletar nada ainda). O diretório `Log_paths/` do host é montado como bind mount somente leitura em `/app/Log_paths` dentro do `agent`, então qualquer log novo escrito ali aparece no container em tempo real.
+Sobe `api` (porta `8000` exposta no host) e `agent`, que roda `minicli -l` (carga inicial) e encerra. O `agent` só fica na rede `iso`, interna — ele fala com a `api` pelo nome do serviço (`http://api:8000`), não por `127.0.0.1`. O diretório `Log_paths/` do host é montado como bind mount somente leitura em `/app/Log_paths` dentro do `agent`, então qualquer log novo escrito ali aparece no container em tempo real.
 
-Configure o agente de dentro do container — os caminhos detectados pelo tutorial já batem com o filesystem do container:
+O `.env` **não** é gerado dentro do container: rode o tutorial no host antes de subir o compose...
 
 ```bash
-docker compose exec agent python minicli.py -t
-docker compose exec agent python minicli.py -l   # carga inicial
-docker compose exec agent python minicli.py -o   # observação contínua
+python minicli.py -t
 ```
 
-O `.env` gerado fica na camada gravável do container: some se ele for recriado, então o tutorial precisa rodar de novo depois de um `--build`/`down`.
+...e o `env_file: .env` do `compose.yml` injeta essas variáveis no `agent` na subida. Como o tutorial hoje grava caminhos locais, ajuste manualmente no `.env` os que precisam apontar pro filesystem do container (prefixo `/app/`), por exemplo:
+
+```dotenv
+LOG_PATH = /app/Log_paths/Apache,/app/Log_paths/Openssh
+CONFIGURATION_FILE = /app/Configuration_Files/filter.yaml
+API_URL = http://api:8000
+API_FILE_PATH = /app/Configuration_Files/
+```
+
+Pra rodar outro comando pontualmente (observação contínua, reenvio pendente, etc.), use `exec` num container já de pé ou `run` pra um descartável:
+
+```bash
+docker compose exec agent minicli -o     # se o agent ainda estiver rodando
+docker compose run --rm agent minicli -sta
+```
 
 ---
 
@@ -127,7 +148,7 @@ O `.env` gerado fica na camada gravável do container: some se ele for recriado,
 - [x] Fazer disparo correto dos logs faltantes
 - [x] Validar variáveis de ambiente na inicialização
 - [x] Tratar truncamento do arquivo de log, reiniciando a leitura do zero
-- [ ] Fazer a tratativa de logs com API fora do ar
+- [x] Fazer a tratativa de logs com API fora do ar
 - [ ] Tratar rotação, com o arquivo renomeado ou recriado
 
 ### Correções pendentes

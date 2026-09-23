@@ -15,11 +15,12 @@ services:
       - iso
     volumes:
       - ./Log_paths:/app/Log_paths:ro
-      - .env:/app/.env
+    env_file:
+      - .env
     depends_on:
       - api
     
-    command: sleep infinity
+    command: minicli -l
 
 networks:
   iso:
