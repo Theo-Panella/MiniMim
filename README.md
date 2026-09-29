@@ -158,6 +158,7 @@ Com o `watch` ativo, logs novos ou apendados no `Log_paths/` do host chegam ao `
 - [x] Tratar truncamento do arquivo de log, reiniciando a leitura do zero
 - [x] Fazer a tratativa de logs com API fora do ar
 - [ ] Tratar rotação, com o arquivo renomeado ou recriado
+- [ ] Implementar Autenticação na API
 
 ### Correções pendentes
 
@@ -169,6 +170,8 @@ Levantadas em revisão do código, em ordem de severidade.
 - [X] Gravar o `filestate.json` de forma atômica e tolerar o arquivo corrompido na leitura, para um `Ctrl+C` não impedir a próxima execução
 - [X] Validar as variáveis de ambiente dentro do `MiniMim.py`, e não só pelo CLI
 - [X] Só avançar o ponteiro de leitura depois do envio confirmado pela API
+- [ ] Adicionar JWT a autenticação da API
+- [ ] Trafego HTTPs entre Endpoint e API
 
 **Altas**
 
@@ -176,3 +179,7 @@ Levantadas em revisão do código, em ordem de severidade.
 - [ ] Não avançar o ponteiro de um serviço que ainda não tem regras no `filter.yaml`
 - [X] Respeitar o lote de 100 no `--observe`, sem despachar a cada evento multilinha
 - [ ] Enviar para a API fora do lock, para não travar a thread do watchdog por até 5s
+- [ ] Criptografar senha de acesso em ambas as pontas (endpoint e API), precisa trafegar já criptografada
+
+**Futuro (aguardar servidor de analise)**
+- [ ] Enviar para o servidor pronto para analise e indexação
