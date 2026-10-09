@@ -1,0 +1,6 @@
+.env
+cli.egg-info
+.venv
+__pycache__
+Log_paths/*
+.env.example

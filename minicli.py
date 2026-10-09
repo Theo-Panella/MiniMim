@@ -3,9 +3,12 @@ import argparse
 import os
 import re
 import json
+import tempfile
 
 import yaml
 import time
+import portalocker
+import requests
 from dotenv import load_dotenv, set_key
 from rich.progress import Progress, MofNCompleteColumn, TextColumn, BarColumn, TimeRemainingColumn
 
@@ -148,8 +151,10 @@ def executa_tutorial():
     print("Este tutorial monta o .env e o filter.yaml respondendo algumas perguntas.")
     print("Enter aceita o valor entre colchetes. Ctrl+C cancela sem gravar nada.")
 
+    titulo("1/4 - Arquivo de regras")
+
     # ---- 1. arquivo de regras ---------------------------------------------
-    titulo("1/3 - Arquivo de regras")
+    titulo("1/4 - Arquivo de regras")
     atual = os.getenv('CONFIGURATION_FILE') or CONFIGURACAO_PADRAO
     caminho_de_configuracao = os.path.abspath(
         os.path.expanduser(pergunta("Caminho do filter.yaml", padrao=atual)))
@@ -161,7 +166,7 @@ def executa_tutorial():
         print("  Arquivo novo - sera criado ao final do tutorial.")
 
     # ---- 2. diretorios de log ---------------------------------------------
-    titulo("2/3 - Diretorios de log")
+    titulo("2/4 - Diretorios de log")
     print("Cada diretorio corresponde a um servico. O nome da pasta escolhe a")
     print("secao de regras usada na filtragem (ex: Apache/ -> Apache:).")
 
@@ -199,8 +204,13 @@ def executa_tutorial():
         servico = pergunta("  Nome do servico", padrao=servico_padrao)
         configuracao[servico] = coleta_regras(servico, configuracao.get(servico))
 
-    # ---- 3. resumo e gravacao ---------------------------------------------
-    titulo("3/3 - Resumo")
+    # ---- 3. endereço da API ---------------------------------------------
+    titulo("3/4 - endereço da API")
+    endereco_api = pergunta("\n  Endereço da API - http://[Endereço]:8000", padrao="127.0.0.1")
+
+
+    # ---- 4. resumo e gravacao ---------------------------------------------
+    titulo("4/4 - Resumo")
     print(f"Arquivo de regras : {caminho_de_configuracao}")
     print("Diretorios        :")
     for diretorio in diretorios:
@@ -220,19 +230,103 @@ def executa_tutorial():
         open(CAMINHO_ENV, 'w', encoding='utf-8').close()
     set_key(CAMINHO_ENV, "LOG_PATH", ",".join(diretorios))
     set_key(CAMINHO_ENV, "CONFIGURATION_FILE", caminho_de_configuracao)
-    caminho_json = "Configuration_Files/filestate.json"
-    if not os.path.exists(caminho_json):
-        os.makedirs(os.path.dirname(caminho_json), exist_ok=True)
-        with open(caminho_json, 'w', encoding='utf-8') as arquivo_json:
+
+    caminho_json_state = "Configuration_Files/filestate.json"
+    caminho_json_API = "Configuration_Files/API_SS.json"
+    diretorio_json = os.path.dirname(caminho_json_state) or "."
+
+    if not os.path.exists(caminho_json_state):
+
+        os.makedirs(diretorio_json, exist_ok=True)
+        with open(caminho_json_state, 'w', encoding='utf-8') as arquivo_json:
             json.dump({}, arquivo_json)
-        print(f"  + {caminho_json} criado.")
-    set_key(CAMINHO_ENV, "JSON_PATH", caminho_json)
-    set_key(CAMINHO_ENV, "API_URL", "http://127.0.0.1:8000")
+        print(f"  + {caminho_json_state} criado.")
+
+    # Nao sobrescreve: o arquivo pode ter lotes pendentes de reenvio.
+    if not os.path.exists(caminho_json_API):
+        with open(caminho_json_API, 'w', encoding='utf-8') as arquivo_estado_api:
+            json.dump([], arquivo_estado_api)
+
+    set_key(CAMINHO_ENV, "STATE_DIR", diretorio_json)
+    set_key(CAMINHO_ENV, "STATE_FILE", caminho_json_state)
+    set_key(CAMINHO_ENV, "API_URL", f"http://{endereco_api}:8000")
+    set_key(CAMINHO_ENV, "API_FILE_PATH", f"{diretorio_json}/")
+    set_key(CAMINHO_ENV, "API_SS_FILE", f"API_SS.json")
     print(f"  + {os.path.abspath(CAMINHO_ENV)} atualizado.")
 
     print("\nPronto. Proximos passos:")
     print("  minicli --load  # carga inicial dos logs existentes")
     print("  minicli --observe   # monitoramento continuo")
+
+
+# --------------------------------------------------------------------------- #
+# Reenvio dos lotes salvos
+# --------------------------------------------------------------------------- #
+
+def grava_lotes_pendentes(apifile_path, caminho_completo, lotes_pendentes):
+    """Regrava o arquivo de lotes pendentes de forma atomica."""
+    with tempfile.NamedTemporaryFile(mode="w", dir=apifile_path, delete=False) as f_temp:
+        json.dump(lotes_pendentes, f_temp)
+        f_temp.flush()
+        os.fsync(f_temp.fileno())
+    os.replace(f_temp.name, caminho_completo)
+
+
+def envia_lotes_pendentes(apifile_path, api_SS):
+    """Reenvia para a API os lotes salvos em disco, tirando cada um do arquivo assim que despachado."""
+    caminho_completo = apifile_path + api_SS
+    url = os.getenv('API_URL')
+
+    if not url:
+        print("API_URL nao configurada, rode: python minicli.py --tutorial")
+        return
+
+    if not os.path.exists(caminho_completo):
+        print("Nenhum lote pendente para enviar.")
+        return
+
+    try:
+        with portalocker.Lock(caminho_completo, mode='rb', timeout=1) as apifile_SS:
+            lotes_pendentes = json.load(apifile_SS)
+    except json.JSONDecodeError as erro:
+        print(f"Arquivo de lotes com erro: {erro}")
+        return
+
+    if not isinstance(lotes_pendentes, list):
+        print("Arquivo de lotes em formato antigo/invalido, nada para enviar.")
+        return
+
+    if not lotes_pendentes:
+        print("Nenhum lote para enviar.")
+        return
+
+    headers = {"Content-Type": "application/json"}
+    enviados = 0
+
+    # Itera sobre uma copia: cada lote enviado com sucesso sai de lotes_pendentes
+    # e o arquivo e regravado na hora, entao uma interrupcao no meio do laco
+    # nao reenvia de novo o que ja foi despachado.
+    for lote in list(lotes_pendentes):
+        try:
+            response = requests.post(url, json={"batch": lote}, headers=headers, timeout=5)
+        except requests.exceptions.ConnectionError as erro:
+            print(f"API fora do ar, error={erro}")
+            # Sem conexao com a API agora, os lotes seguintes tambem vao falhar.
+            break
+        except requests.exceptions.RequestException as erro:
+            print(f"Erro ao enviar, error={erro}")
+            continue
+
+        if response.status_code != 200:
+            print(f"Falha ao enviar, status code: {response.status_code}")
+            continue
+
+        enviados += 1
+        lotes_pendentes.remove(lote)
+        grava_lotes_pendentes(apifile_path, caminho_completo, lotes_pendentes)
+
+    print("=="*40)
+    print(f"{enviados} lote(s) enviado(s), {len(lotes_pendentes)} ainda pendente(s)")
 
 
 # --------------------------------------------------------------------------- #
@@ -259,12 +353,13 @@ def main():
     parser.add_argument('-l','--load', action='store_true', help="Faz a carga inicial dos arquivos nos diretorios definidos no .env")
     parser.add_argument('-o','--observe', action='store_true', help="Inicia a observacao continua dos diretorios de log")
     parser.add_argument('-c','--clean', action='store_true', help="Limpa o arquivo do ponteiro de leitura")
+    parser.add_argument('-sta','--sendtoapi', action='store_true', help="Envia batchs salvas para API")
 
     args = parser.parse_args()
 
     log_path = [p for p in (os.getenv('LOG_PATH') or '').split(',') if p.strip()]
     
-    path_arquivo_json = os.getenv('JSON_PATH')
+    arquivo_de_estado = os.getenv('STATE_FILE')
     
     caminho_de_configuracao = os.getenv('CONFIGURATION_FILE')
 
@@ -277,7 +372,7 @@ def main():
 
     if args.load:
         start = time.perf_counter()
-        if not log_path or not path_arquivo_json or not caminho_de_configuracao:
+        if not log_path or not arquivo_de_estado or not caminho_de_configuracao:
             return
         print("Iniciando Coleta de Logs")
         print("=="*40)
@@ -305,23 +400,32 @@ def main():
         return
 
     if args.observe:
-        if not log_path or not path_arquivo_json or not caminho_de_configuracao:
+        if not log_path or not arquivo_de_estado or not caminho_de_configuracao:
             print("Nao configurado, rode: python minicli.py --tutorial")
+            return
         else:
             from MiniMim import cria_observer
             cria_observer()
+            return
 
     if args.clean:
-        if path_arquivo_json:
-            json_aberto = open(path_arquivo_json,"w")
+        if arquivo_de_estado:
+            json_aberto = open(arquivo_de_estado,"w")
             json.dump({},json_aberto)
             json_aberto.close()
             print("="*23)
             print("= Arquivo .json limpo =")
             print("="*23)
+            return
         else:
             print("Arquivo .json não localizado")
             return
+
+    if args.sendtoapi:
+        apifile_path = os.getenv('API_FILE_PATH', 'Configuration_Files/')
+        api_SS = os.getenv('API_SS_FILE', 'API_SS.json') # API Save State.json
+        envia_lotes_pendentes(apifile_path, api_SS)
+        return
 
     else:
         parser.print_help()

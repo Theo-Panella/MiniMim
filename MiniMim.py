@@ -7,15 +7,30 @@ import logging
 import requests
 import yaml
 import threading
+import portalocker
+import tempfile
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
-from watchdog.observers import Observer
+from watchdog.observers.polling import PollingObserver as Observer
+#from watchdog.observers import Observer
 
 load_dotenv()
+
+VARIAVEIS_DE_AMBIENTE = [os.getenv('CONFIGURATION_FILE'), os.getenv('LOG_PATH'),
+                         os.getenv('STATE_DIR'), os.getenv('API_URL'), os.getenv('STATE_FILE')]
+
+# Checar variaveis de ambiente
+if not all(VARIAVEIS_DE_AMBIENTE):
+    print("Erro ao iniciar MiniMim, configure o ambiente usando minicli -t")
+    raise SystemExit()
+
 caminho_de_configuracao = os.getenv('CONFIGURATION_FILE')
 log_path = os.getenv('LOG_PATH').split(',')
-path_arquivo_json = os.getenv('JSON_PATH')
+diretorio_de_estado = os.getenv('STATE_DIR')
+arquivo_de_estado = os.getenv('STATE_FILE')
 log_from_logging = logging.getLogger(__name__)
 url = os.getenv('API_URL')
+apifile_path = os.getenv('API_FILE_PATH', 'Configuration_Files/')
+api_SS = os.getenv('API_SS_FILE', 'API_SS.json')
 qtd = 0
 batch_de_logs = {}
 ultimo_envio = time.monotonic()
@@ -25,17 +40,20 @@ lock = threading.Lock()
 TAMANHO_DO_LOTE = 100
 INTERVALO_DE_ENVIO = 5.0
 
-
 # Abre o arquivo de configuracao e compila os padroes para melhor desempenho.
 # Tem mais processamento na primeira rodagem por compilar todas as regras de uma vez.
-with open(caminho_de_configuracao, 'r') as arquivo_de_configuracao_puro:
+with portalocker.Lock(caminho_de_configuracao, mode='rb', timeout=1) as arquivo_de_configuracao_puro:
     configuracao = yaml.safe_load(arquivo_de_configuracao_puro)
 
 # O indice de leitura e estado local: pode nao existir na primeira execucao.
-if os.path.exists(path_arquivo_json):
-    with open(path_arquivo_json, 'r') as arquivo_json:
-        relacao_pos_file = json.load(arquivo_json)
-else:
+try:
+    if os.path.exists(arquivo_de_estado):
+        with open(arquivo_de_estado, 'r') as arquivo_json:
+            relacao_pos_file = json.load(arquivo_json)
+    else:
+        relacao_pos_file = {}
+except Exception as e:
+    print(f"Arquivo de estado corrompido, reiniciando o indice do zero. Error={e}")
     relacao_pos_file = {}
 
 regras = {
@@ -68,9 +86,10 @@ def cria_observer():
         while True:
             time.sleep(2)
             envia_sobrando()
-    finally:
-        print("Acabou")
+    except KeyboardInterrupt:
         observer.stop()
+    finally:
+        print("Observador Morto")
         observer.join()
 
 
@@ -79,7 +98,7 @@ class MyEventHandler(FileSystemEventHandler):
         # Posicao da ultima leitura: na primeira vez faz a ingestao inicial
         # e depois continua a partir de onde parou.
         self._pos = 0
-        
+
     def on_any_event(self, event: FileSystemEvent) -> None:
         if event.event_type == "modified" and not event.is_directory:
             popula_indice(event.src_path)
@@ -94,7 +113,7 @@ def popula_indice(evento):
 
 def ler_arquivo(evento):
     try:
-        with open(evento, "rb") as file:
+        with portalocker.Lock(evento, mode="rb",timeout=1 ) as file:
             pos_inicial = relacao_pos_file[evento]
             file.seek(pos_inicial)
             conteudo = file.read()
@@ -106,21 +125,30 @@ def ler_arquivo(evento):
 
             completo = conteudo[:ultima_quebra + 1]
             novas_linhas = completo.decode("utf-8",errors="replace").splitlines()
-            
+
             # Reposiciona exatamente no fim da ultima linha completa.
             # seek() em modo texto so aceita posicoes vindas de tell(),
             # entao relemos so o trecho completo para obter uma posicao valida.
-            relacao_pos_file[evento] = pos_inicial + len(completo)
+            with lock:
+                relacao_pos_file[evento] = pos_inicial + len(completo)
             servico_do_evento = os.path.basename(os.path.dirname(evento))
             pre_filtro(novas_linhas, regras, servico_do_evento)
-            json_aberto = open(path_arquivo_json,"w")
-            json.dump(relacao_pos_file,json_aberto)
-            json_aberto.close()
-                              
+
     except Exception:
         log_from_logging.exception("falha no pre_filtro, servico=%s", os.path.basename(os.path.dirname(evento)))
 
 # Funções Auxiliares de escrita
+def escreve_ponteiro(relacao_pos_file):
+    # Grava num arquivo temporario no mesmo diretorio e troca com os.replace,
+    # que e atomico: nunca deixa o arquivo de indice pela metade.
+    with tempfile.NamedTemporaryFile('w', dir=diretorio_de_estado, delete=False) as f_temp:
+        json.dump(relacao_pos_file,f_temp)
+        f_temp.flush()
+        os.fsync(f_temp.fileno())
+
+    os.replace(f_temp.name, arquivo_de_estado)
+
+
 def soma_mais_um(zera: bool):
     """ Soma sequencial de linhas lidas """
     global qtd
@@ -143,10 +171,15 @@ def despacha_lote():
     """ Envia o que estiver acumulado e reinicia o contador e o relogio """
     global ultimo_envio
     ultimo_envio = time.monotonic()
-    if qtd:
-        envio_para_API(batch_de_logs)
-        clear_batch()
-        soma_mais_um(True)
+    try:
+        if qtd:
+            if envio_para_API(batch_de_logs) == True:
+                clear_batch()
+                soma_mais_um(True)
+                escreve_ponteiro(relacao_pos_file)
+
+    except Exception as e:
+        print(f"Depacha_lote, Error={e}")
 
 def envia_sobrando():
     """ Despacha o lote incompleto quando o intervalo vence; chamado pelo observer """
@@ -162,22 +195,12 @@ def finaliza_envio():
 def pre_filtro(ultimas_linhas, regras, servico_do_evento):
     """Classifica cada linha nova lida do log; o primeiro match (mais especifico) vence."""
     try:
-        regras_do_servico = regras.get(servico_do_evento)
-        if regras_do_servico is None:
-            return
-
         with lock:
-            if len(ultimas_linhas) == 1:
-                linha = ultimas_linhas[0].strip()
-                for regra in regras_do_servico:
-                    if regra["padrao"].search(linha):
-                        update_batch(linha, servico_do_evento, regra["id"])
-                        soma_mais_um(False)
-                        if qtd >= TAMANHO_DO_LOTE:
-                            despacha_lote()
-                        break
+            regras_do_servico = regras.get(servico_do_evento)
+            if regras_do_servico is None:
+                return
 
-            if len(ultimas_linhas) > 1:
+            if len(ultimas_linhas) >= 1:
                 for cada_linha in ultimas_linhas:
                     linha = cada_linha.strip()
                     for regra in regras_do_servico:
@@ -188,12 +211,44 @@ def pre_filtro(ultimas_linhas, regras, servico_do_evento):
                                 despacha_lote()
                             break
 
-                # A carga inicial le o arquivo inteiro de uma vez: fecha o resto aqui.
-                despacha_lote()
-
     except Exception:
         log_from_logging.exception("falha no pre_filtro, servico=%s", servico_do_evento)
 
+def salvar_logs(apifile_path,api_SS):
+    """Acrescenta a batch atual ao arquivo de lotes pendentes, sem duplicar a mesma batch."""
+    caminho_completo = apifile_path + api_SS
+
+    # JSON so aceita chaves string: normaliza a batch pelo mesmo caminho antes de comparar,
+    # senao as chaves inteiras nunca batem com o que foi lido do disco.
+    batch_normalizada = json.loads(json.dumps(batch_de_logs))
+
+    if os.path.exists(caminho_completo):
+        try:
+            with portalocker.Lock(caminho_completo, mode='rb', timeout=1) as apifile_SS:
+                lotes_salvos = json.load(apifile_SS)
+        except json.JSONDecodeError:
+            lotes_salvos = []
+        if not isinstance(lotes_salvos, list):
+            # Formato antigo (um unico lote salvo como dict): descarta e comeca a lista do zero.
+            lotes_salvos = []
+    else:
+        lotes_salvos = []
+
+    if batch_normalizada in lotes_salvos:
+        print("batch ja cadastrada")
+        return
+
+    lotes_salvos.append(batch_normalizada)
+
+    with tempfile.NamedTemporaryFile(mode="w", dir=apifile_path, delete=False) as f_temp:
+        json.dump(lotes_salvos, f_temp)
+        f_temp.flush()
+        os.fsync(f_temp.fileno())
+    os.replace(f_temp.name, caminho_completo)
+
+    print("=="*40)
+    print("Os logs filtrados foram salvos e estão arquivados")
+    print("rode [minicli -sta] para enviar para api quando estiver online")
 
 def envio_para_API(batch_de_logs):
     """Envia o log classificado para o centralizador."""
@@ -203,11 +258,18 @@ def envio_para_API(batch_de_logs):
     try:
         response = requests.post(url, json=data, headers=headers, timeout=5)
         if response.status_code == 200:
-            return
+            return True
         else:
             print(f"Falha ao enviar, Status code: {response.status_code}")
-    except requests.exceptions.RequestException:
-        log_from_logging.exception("Erro ao enviar log para o centralizador")
+            salvar_logs(apifile_path,api_SS)
 
+    except requests.exceptions.ConnectionError as error:
+        print(f"API fora do ar, error={error}")
+        salvar_logs(apifile_path,api_SS)
+
+    except requests.exceptions.RequestException as error:
+        print(f"API fora do ar, error={error}")
+        salvar_logs(apifile_path,api_SS)
+        
 if __name__ == "__main__":
     cria_observer()

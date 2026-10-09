@@ -1,0 +1,34 @@
+services:
+  api:
+    build: .
+    networks:
+      - public
+      - iso
+    ports:
+      - 8000:8000
+
+    command: gunicorn --bind 0.0.0.0:8000 api:app
+
+  agent:
+    build: .
+    networks:
+      - iso
+      
+    # Adicione os logs que forem ser coletado no volume abaixo
+    volumes:
+      - ./Configuration_Files:/app/Configuration_Files:rw
+      # [caminho_original]:/app/Log_paths:ro
+    env_file:
+      - .env
+    depends_on:
+      - api
+
+
+    command: sleep infinity
+
+networks:
+  iso:
+    internal: true
+  public:
+
+

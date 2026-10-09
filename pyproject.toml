@@ -11,7 +11,7 @@ dependencies = [
     "PyYAML",
     "watchdog",
     "rich",
-    "regex",
+    "portalocker",
 ]
 
 [project.scripts]
