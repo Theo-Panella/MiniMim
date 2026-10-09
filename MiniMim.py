@@ -10,7 +10,8 @@ import threading
 import portalocker
 import tempfile
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
-from watchdog.observers import Observer
+from watchdog.observers.polling import PollingObserver as Observer
+#from watchdog.observers import Observer
 
 load_dotenv()
 

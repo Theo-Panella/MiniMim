@@ -11,15 +11,13 @@ services:
 
   agent:
     build: .
-    develop:
-      watch:
-        - action: sync
-          path: ./Log_paths
-          target: /app/Log_paths
     networks:
       - iso
+      
+    # Adicione os logs que forem ser coletado no volume abaixo
     volumes:
       - ./Configuration_Files:/app/Configuration_Files:rw
+      # [caminho_original]:/app/Log_paths:ro
     env_file:
       - .env
     depends_on:
