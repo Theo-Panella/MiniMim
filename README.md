@@ -1,56 +1,91 @@
-# MiniMim
-
 <p align="center">
   <img src="logo.png" alt="MiniMim" width="300">
 </p>
 
-Agente leve de coleta e pré-filtragem de logs. Monitora vários arquivos de log em tempo real e classifica cada linha nova com regras de regex por serviço.
+<h1 align="center">MiniMim</h1>
 
-A ideia é fazer a triagem **na ponta**: em vez de mandar o log inteiro pra um servidor central, o MiniMim decide localmente o que é relevante, reduzindo tráfego e processamento.
+<p align="center">
+  <b>Triagem de logs na ponta.</b><br>
+  Um agente leve que lê, filtra e só envia o que importa.
+</p>
 
-> Logs de amostra vêm do projeto [loghub](https://github.com/logpai/loghub.git).
+<p align="center">
+  <img alt="Python" src="https://img.shields.io/badge/python-3.14-blue">
+  <img alt="Docker" src="https://img.shields.io/badge/docker-ready-2496ED">
+  <img alt="Status" src="https://img.shields.io/badge/status-em%20desenvolvimento-orange">
+</p>
+
+---
+
+## Por que o MiniMim?
+
+Mandar todo o log de todas as máquinas para um servidor central é caro: consome rede, armazenamento e processamento, e a maior parte do que chega é ruído.
+
+O MiniMim inverte a lógica. Ele roda **no próprio endpoint**, acompanha seus arquivos de log em tempo real e decide localmente o que é relevante, com regras de regex que você define por serviço. Só as linhas que casam com alguma regra seguem para a API central, em lotes.
+
+- **Leve:** um processo Python, sem banco de dados e sem dependências pesadas.
+- **Configurável:** uma seção no `filter.yaml` por serviço, com regras ordenadas por especificidade.
+- **Resiliente:** retoma de onde parou entre execuções, trata truncamento de arquivo e guarda localmente os lotes que a API não recebeu, para reenviar depois.
+- **Fácil de começar:** um tutorial interativo monta toda a configuração para você.
+
+> Os logs de amostra vêm do projeto [loghub](https://github.com/logpai/loghub.git).
+
+---
+
+## Como funciona
+
+```
+ arquivos de log ──► watchdog ──► pré-filtro (regex) ──► lote de 100 ──► API central
+   (por serviço)    linhas novas   regra mais específica   POST /        (api.py)
+                                   vence                       │
+                                                               └─ falhou? salva em API_SS.json
+                                                                  e reenvia com `minicli -sta`
+```
+
+1. Na inicialização, o `.env` é carregado e validado, o `filter.yaml` é lido e o índice de posições (`STATE_FILE`) é restaurado. As regras de cada serviço são compiladas e ordenadas por `especificidade` (maior primeiro).
+2. O [watchdog](https://pypi.org/project/watchdog/) observa cada diretório de `LOG_PATH`. A cada modificação, o agente lê só as linhas novas e grava a posição do último `seek`, de forma atômica, então a leitura continua de onde parou.
+3. Cada linha nova é comparada com as regras do serviço deduzido do nome da pasta. O primeiro match, o mais específico, vence.
+4. As linhas que casam são enviadas à API em lotes de 100 (com despacho do que sobrar na observação contínua). O ponteiro de leitura só avança depois que a API confirma o recebimento.
+
+> O nome de cada pasta de log precisa bater com a seção do `filter.yaml` (ex.: `Apache/` ↔ `Apache:`). É assim que o agente escolhe as regras certas para cada arquivo.
 
 ---
 
 ## Estrutura
 
 ```
-MiniMim-Agent/
+MiniMim/
 ├── minicli.py                 # CLI: tutorial, carga inicial e observação
 ├── MiniMim.py                 # agente principal: watchdog + pré-filtro
 ├── api.py                     # centralizador de logs (Flask), recebe os POSTs do agente
 ├── Configuration_Files/
 │   ├── filter.yaml            # regras de filtragem, uma seção por serviço
-│   └── filestate.json         # índice de leitura por arquivo, versionado vazio
-├── Log_paths/
-│   ├── Apache/                # pastas de log de amostra, uma por serviço
-│   └── Openssh/
-├── escreve_log_teste.py       # gera linhas de log continuamente, pra teste
+│   └── filestate.json         # índice de leitura por arquivo
+├── Log_paths/                 # logs de amostra, uma pasta por serviço (não versionado)
+├── escreve_log_teste.py       # gera linhas de log continuamente, para teste
+├── compose.yml / dockerfile   # execução em containers
+├── .env.example               # modelo de configuração
 └── .env                       # configuração local (não versionado)
 ```
 
-O nome de cada pasta de log precisa bater com a seção correspondente no `filter.yaml` (ex: `Apache/` ↔ `Apache:`) — é assim que o agente escolhe as regras certas para cada arquivo.
-
 ---
 
-## Como funciona
-
-1. Na inicialização, o `.env` é carregado, o `filter.yaml` é lido e o índice de posições em `STATE_FILE` é restaurado; as regras de cada serviço são compiladas e ordenadas por `especificidade` (maior primeiro).
-2. O [watchdog](https://pypi.org/project/watchdog/) observa cada diretório listado em `LOG_PATH`. A cada modificação, o agente lê só as linhas novas de cada arquivo e regrava a posição do último `seek` no arquivo de índice, então a leitura continua de onde parou entre execuções.
-3. Cada linha nova é comparada com as regras do serviço deduzido do nome da pasta; o primeiro match — o mais específico — vence.
-4. Cada linha que casa vai para `envio_para_API()`, num POST para o endpoint definido em .env.
-> `api.py` é somente para teste de funcionalidade por enquanto, não possui autenticação e roda em debug de forma proposital
-
----
-
-## Uso
+## Começando
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Configure o `.env`:
+### 1. Configure
+
+O jeito mais rápido é o tutorial interativo, que monta o `.env` e o `filter.yaml` por perguntas:
+
+```bash
+python minicli.py -t
+```
+
+Se preferir, copie o `.env.example` e edite:
 
 ```dotenv
 LOG_PATH = /caminho/para/Apache/,/caminho/para/Openssh/
@@ -62,46 +97,44 @@ API_FILE_PATH = Configuration_Files/
 API_SS_FILE = API_SS.json
 ```
 
-`LOG_PATH` é uma lista de diretórios (um por serviço); `CONFIGURATION_FILE` aponta pro `filter.yaml`; `STATE_FILE` é o arquivo onde o índice de leitura é gravado, e `STATE_DIR` é o diretório que o contém (usado pra gravar o índice de forma atômica: escreve num arquivo temporário nesse diretório e troca pelo `STATE_FILE` só no final). `API_URL` é o endereço do centralizador (`api.py`). `API_FILE_PATH`/`API_SS_FILE` apontam pro arquivo onde ficam os lotes que falharam o envio, pendentes de reenvio. O tutorial grava todas.
+| Variável | Para que serve |
+|---|---|
+| `LOG_PATH` | Lista de diretórios de log, separados por vírgula (um por serviço) |
+| `CONFIGURATION_FILE` | Caminho do `filter.yaml` |
+| `STATE_FILE` | Arquivo onde o índice de leitura é gravado |
+| `STATE_DIR` | Diretório do `STATE_FILE`, usado para a gravação atômica (arquivo temporário + troca) |
+| `API_URL` | Endereço do centralizador (`api.py`) |
+| `API_FILE_PATH` / `API_SS_FILE` | Onde ficam os lotes que falharam o envio, pendentes de reenvio |
 
-O tutorial interativo monta o `.env` e o `filter.yaml` respondendo perguntas:
+### 2. Suba a API
 
-```bash
-python minicli.py -t
-```
-
-Carga inicial (lê o que já existe nos logs):
-
-```bash
-python minicli.py -l
-```
-
-Monitoramento contínuo:
-
-```bash
-python minicli.py -o
-```
-
-Limpa o ponteiro de leitura:
-
-```bash
-python minicli.py -c
-```
-
-Reenvia pra API os lotes que falharam o envio e ficaram salvos localmente (em `API_FILE_PATH`/`API_SS_FILE`):
-
-```bash
-python minicli.py -sta
-```
-
-`Log_paths/` não é versionado (`*.log` está no `.gitignore`), então num clone novo não há logs de amostra. `escreve_log_teste.py` cria `Log_paths/Openssh/OpenSSH_2k.log` e gera linhas de teste continuamente nele, útil pra ver o watchdog reagir (rode da raiz do projeto). Encerre qualquer processo com `Ctrl+C`.
-
-A API que recebe os logs precisa estar de pé antes da coleta. O `gunicorn` só roda em Linux — ele importa `fcntl` —, então no Windows use o `waitress`:
+A API precisa estar de pé antes da coleta. O `gunicorn` só roda em Linux (ele importa `fcntl`), então no Windows use o `waitress`:
 
 ```bash
 waitress-serve --host=127.0.0.1 --port=8000 api:app   # Windows
 gunicorn --bind 127.0.0.1:8000 api:app                # Linux
 ```
+
+> O `api.py` é, por enquanto, um receptor de teste: não tem autenticação e apenas imprime o que recebe.
+
+### 3. Colete
+
+```bash
+python minicli.py -l     # carga inicial: lê o que já existe nos logs
+python minicli.py -o     # observação contínua (Ctrl+C encerra)
+```
+
+### Comandos
+
+| Comando | O que faz |
+|---|---|
+| `minicli.py -t` | Tutorial interativo de configuração |
+| `minicli.py -l` | Carga inicial dos arquivos nos diretórios do `.env` |
+| `minicli.py -o` | Observação contínua dos diretórios de log |
+| `minicli.py -c` | Limpa o ponteiro de leitura |
+| `minicli.py -sta` | Reenvia à API os lotes que falharam e ficaram salvos localmente |
+
+Um clone novo não tem logs de amostra (`*.log` está no `.gitignore`). O `escreve_log_teste.py` cria `Log_paths/Openssh/OpenSSH_2k.log` e gera linhas continuamente nele, ótimo para ver o watchdog reagir (rode da raiz do projeto).
 
 ---
 
@@ -111,9 +144,12 @@ gunicorn --bind 127.0.0.1:8000 api:app                # Linux
 docker compose up -d --build
 ```
 
-Sobe `api` (porta `8000` exposta no host) e `agent`, que fica de pé com `sleep infinity` sem coletar nada sozinho: a coleta é disparada com `docker compose exec` (abaixo). O `agent` só fica na rede `iso`, interna — ele fala com a `api` pelo nome do serviço (`http://api:8000`), não por `127.0.0.1`. O `Log_paths/` do host **não** é um bind mount: no Docker Desktop o `inotify` não recebe eventos de escritas feitas no host através dele, e o `minicli -o` nunca reagiria. Em vez disso o `compose.yml` usa o Compose Watch (`develop.watch`, ação `sync`), que copia os logs alterados do host para `/app/Log_paths` dentro do container. Sem o `watch` rodando nada é sincronizado: o container só tem a cópia que entrou na imagem no build, e num clone novo ela é vazia.
+Sobe dois serviços:
 
-O `.env` **não** é gerado dentro do container e o `compose.yml` falha se ele não existir no host. Rode o tutorial no host antes de subir (`python minicli.py -t`); o `env_file: .env` do `compose.yml` injeta as variáveis no `agent` na subida. Como o tutorial grava caminhos do host, ajuste manualmente no `.env` os que precisam apontar pro filesystem do container (prefixo `/app/`), por exemplo:
+- **`api`**: expõe a porta `8000` no host e fica nas redes `public` e `iso`.
+- **`agent`**: fica só na rede `iso`, que é interna, e fala com a API pelo nome do serviço (`http://api:8000`). Ele sobe com `sleep infinity` e não coleta nada sozinho; a coleta é disparada com `docker compose exec`.
+
+O `.env` **não** é gerado dentro do container, e o `compose.yml` falha se ele não existir no host. Rode o tutorial no host antes de subir (`python minicli.py -t`) e ajuste os caminhos que precisam apontar para o filesystem do container (prefixo `/app/`). O `.env.example` já traz um modelo:
 
 ```dotenv
 LOG_PATH = /app/Log_paths/Apache,/app/Log_paths/Openssh
@@ -122,15 +158,7 @@ API_URL = http://api:8000
 API_FILE_PATH = /app/Configuration_Files/
 ```
 
-Como `Log_paths/` não é versionado, crie as pastas (`Log_paths/Apache`, `Log_paths/Openssh`) com alguns logs antes de subir.
-
-Em um terminal, deixe o `watch` rodando (ele fica em primeiro plano e recria o `agent` ao iniciar):
-
-```bash
-docker compose watch
-```
-
-Espere a mensagem `Watch enabled` e, em outro terminal, dispare a coleta e os demais comandos com `exec`. Não use `exec` antes disso: o `agent` é recriado e o comando morre junto.
+Os logs a coletar precisam ser montados no serviço `agent` (veja o comentário no `compose.yml`). Com tudo no ar, dispare a coleta:
 
 ```bash
 docker compose exec agent minicli -l     # carga inicial
@@ -139,9 +167,7 @@ docker compose exec agent minicli -sta   # reenvia lotes pendentes
 docker compose exec agent minicli -c     # limpa o ponteiro de leitura
 ```
 
-Com o `watch` ativo, logs novos ou apendados no `Log_paths/` do host chegam ao `-o` e vão para a API.
-
-`Configuration_Files/` é montado do host em `/app/Configuration_Files` (leitura e escrita), então o `filter.yaml`, o `filestate.json` e os lotes pendentes em `API_SS.json` sobrevivem a `down`/`--build`.
+`Configuration_Files/` é montado do host em `/app/Configuration_Files` (leitura e escrita), então o `filter.yaml`, o `filestate.json` e os lotes pendentes em `API_SS.json` sobrevivem a `down` e `--build`.
 
 ---
 
