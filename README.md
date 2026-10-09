@@ -149,7 +149,13 @@ Sobe dois serviços:
 - **`api`**: expõe a porta `8000` no host e fica nas redes `public` e `iso`.
 - **`agent`**: fica só na rede `iso`, que é interna, e fala com a API pelo nome do serviço (`http://api:8000`). Ele sobe com `sleep infinity` e não coleta nada sozinho; a coleta é disparada com `docker compose exec`.
 
-O `.env` **não** é gerado dentro do container, e o `compose.yml` falha se ele não existir no host. Rode o tutorial no host antes de subir (`python minicli.py -t`) e ajuste os caminhos que precisam apontar para o filesystem do container (prefixo `/app/`). O `.env.example` já traz um modelo:
+O `.env` **não** é gerado dentro do container, e o `compose.yml` falha se ele não existir no host. Rode o tutorial no host antes de subir, ou renomeie `.env.example` para `.env` e rode 
+
+```bash
+python minicli.py -t
+````
+
+E ajuste os caminhos que precisam apontar para o filesystem do container (prefixo `/app/`). O `.env.example` já traz um modelo:
 
 ```dotenv
 LOG_PATH = /app/Log_paths/Apache,/app/Log_paths/Openssh
@@ -158,7 +164,17 @@ API_URL = http://api:8000
 API_FILE_PATH = /app/Configuration_Files/
 ```
 
-Os logs a coletar precisam ser montados no serviço `agent` (veja o comentário no `compose.yml`). Com tudo no ar, dispare a coleta:
+Antes de subir, **monte os logs no serviço `agent`**. No `compose.yml`, em `agent > volumes`, descomente a linha de exemplo e troque `[caminho_original]` pela pasta de logs do host:
+
+```yaml
+    volumes:
+      - ./Configuration_Files:/app/Configuration_Files:rw
+      - ./Log_paths:/app/Log_paths:ro      # linha que você descomenta e ajusta
+```
+
+O destino dentro do container (`/app/Log_paths`) precisa bater com os caminhos do `LOG_PATH` no `.env`. Sem essa linha o agente não enxerga nenhum log e a coleta termina sem enviar nada.
+
+Com tudo no ar, dispare a coleta:
 
 ```bash
 docker compose exec agent minicli -l     # carga inicial
