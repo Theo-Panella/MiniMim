@@ -10,9 +10,11 @@
 </p>
 
 <p align="center">
-  <img alt="Python" src="https://img.shields.io/badge/python-3.14-blue">
+  <a href="https://github.com/Theo-Panella/MiniMim/actions/workflows/codeql.yml"><img alt="CodeQL" src="https://img.shields.io/github/actions/workflow/status/Theo-Panella/MiniMim/codeql.yml?branch=main&label=CodeQL"></a>
+  <a href="LICENSE"><img alt="Licença" src="https://img.shields.io/github/license/Theo-Panella/MiniMim"></a>
+  <a href="https://github.com/Theo-Panella/MiniMim/commits"><img alt="Último commit" src="https://img.shields.io/github/last-commit/Theo-Panella/MiniMim/dev?label=%C3%BAltimo%20commit"></a>
+  <img alt="Linguagem" src="https://img.shields.io/github/languages/top/Theo-Panella/MiniMim">
   <img alt="Docker" src="https://img.shields.io/badge/docker-ready-2496ED">
-  <img alt="Status" src="https://img.shields.io/badge/status-em%20desenvolvimento-orange">
 </p>
 
 ---
