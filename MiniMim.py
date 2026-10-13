@@ -173,6 +173,7 @@ def despacha_lote():
     ultimo_envio = time.monotonic()
     try:
         if qtd:
+            envio_para_API(batch_de_logs)
             clear_batch()
             soma_mais_um(True)
             escreve_ponteiro(relacao_pos_file)
