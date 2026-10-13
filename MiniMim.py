@@ -173,10 +173,9 @@ def despacha_lote():
     ultimo_envio = time.monotonic()
     try:
         if qtd:
-            if envio_para_API(batch_de_logs) == True:
-                clear_batch()
-                soma_mais_um(True)
-                escreve_ponteiro(relacao_pos_file)
+            clear_batch()
+            soma_mais_um(True)
+            escreve_ponteiro(relacao_pos_file)
 
     except Exception as e:
         print(f"Depacha_lote, Error={e}")
