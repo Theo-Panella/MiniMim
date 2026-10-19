@@ -187,7 +187,11 @@ docker compose exec agent minicli -c     # limpa o ponteiro de leitura
 
 `Configuration_Files/` é montado do host em `/app/Configuration_Files` (leitura e escrita), então o `filter.yaml`, o `filestate.json` e os lotes pendentes em `API_SS.json` sobrevivem a `down` e `--build`.
 
----
+
+## Uso de IA
+
+Usei o [Claude Code](https://claude.com/claude-code) como par de programação em algumas frentes. O visual do minicli.py foi feito por ele, e as contribuições em código estão marcadas com `Co-Authored-By` no histórico.
+
 
 ## Roadmap
 
