@@ -217,7 +217,7 @@ Levantadas em revisão do código, em ordem de severidade.
 - [X] Corrigir o `compose.yml`: rede única entre `agent` e `api`, bind em `0.0.0.0`, comando do agente e montagem dos diretórios de log
 - [X] Gravar o `filestate.json` de forma atômica e tolerar o arquivo corrompido na leitura, para um `Ctrl+C` não impedir a próxima execução
 - [X] Validar as variáveis de ambiente dentro do `MiniMim.py`, e não só pelo CLI
-- [X] Só avançar o ponteiro de leitura depois do envio confirmado pela API
+- [X] O ponteiro só é gravado depois que o lote foi entregue à API ou salvo localmente para reenvio
 - [ ] Adicionar JWT a autenticação da API
 - [ ] Trafego HTTPs entre Endpoint e API
 
@@ -227,6 +227,7 @@ Levantadas em revisão do código, em ordem de severidade.
 - [ ] Não avançar o ponteiro de um serviço que ainda não tem regras no `filter.yaml`
 - [ ] Tratar arquivos tmp de filestate que sobram ao interromper `minicli -l`
 - [X] Respeitar o lote de 100 no `--observe`, sem despachar a cada evento multilinha
+- [ ] Rotação: copytruncate e reuso de inode (fingerprint no índice)
 - [ ] Enviar para a API fora do lock, para não travar a thread do watchdog por até 5s
 - [ ] Criptografar senha de acesso em ambas as pontas (endpoint e API), precisa trafegar já criptografada
 
