@@ -205,7 +205,7 @@ Usei o [Claude Code](https://claude.com/claude-code) como par de programação e
 - [x] Validar variáveis de ambiente na inicialização
 - [x] Tratar truncamento do arquivo de log, reiniciando a leitura do zero
 - [x] Fazer a tratativa de logs com API fora do ar
-- [ ] Tratar rotação, com o arquivo renomeado ou recriado
+- [x] Tratar rotação, com o arquivo renomeado ou recriado
 - [ ] Implementar Autenticação na API
 
 ### Correções pendentes
@@ -225,6 +225,7 @@ Levantadas em revisão do código, em ordem de severidade.
 
 - [X] Não persistir a posição de leitura quando o `pre_filtro` levanta exceção
 - [ ] Não avançar o ponteiro de um serviço que ainda não tem regras no `filter.yaml`
+- [ ] Tratar arquivos tmp de filestate que sobram ao interromper `minicli -l`
 - [X] Respeitar o lote de 100 no `--observe`, sem despachar a cada evento multilinha
 - [ ] Enviar para a API fora do lock, para não travar a thread do watchdog por até 5s
 - [ ] Criptografar senha de acesso em ambas as pontas (endpoint e API), precisa trafegar já criptografada

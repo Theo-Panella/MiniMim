@@ -89,7 +89,7 @@ def cria_observer():
     except KeyboardInterrupt:
         observer.stop()
     finally:
-        print("Observador Morto")
+        print("\nObservador Morto")
         observer.join()
 
 
@@ -100,21 +100,30 @@ class MyEventHandler(FileSystemEventHandler):
         self._pos = 0
 
     def on_any_event(self, event: FileSystemEvent) -> None:
-        if event.event_type == "modified" and not event.is_directory:
-            popula_indice(event.src_path)
-
+        try:
+            if (event.event_type == "modified" and not event.is_directory) or (event.event_type == "created" and not event.is_directory):
+                popula_indice(event.src_path)
+        except Exception as error:
+            print(f"Error: {error}")
+            return
 
 def popula_indice(evento):
-    if evento not in relacao_pos_file or os.path.getsize(evento) < relacao_pos_file[evento]:
-        relacao_pos_file[evento] = 0
-        ler_arquivo(evento)
-    else:
-        ler_arquivo(evento)
+    try:
+        inode_number = str(os.stat(evento).st_ino)
+        if inode_number not in relacao_pos_file or os.path.getsize(evento) < relacao_pos_file[inode_number]:
+            relacao_pos_file[inode_number] = 0
+            ler_arquivo(evento)
+        else:
+            ler_arquivo(evento)
+    except Exception as error:
+        print(f"Error:{error}")
+        return
 
 def ler_arquivo(evento):
     try:
         with portalocker.Lock(evento, mode="rb",timeout=1 ) as file:
-            pos_inicial = relacao_pos_file[evento]
+            inode_number = str(os.stat(evento).st_ino)
+            pos_inicial = relacao_pos_file[inode_number]
             file.seek(pos_inicial)
             conteudo = file.read()
 
@@ -130,7 +139,7 @@ def ler_arquivo(evento):
             # seek() em modo texto so aceita posicoes vindas de tell(),
             # entao relemos so o trecho completo para obter uma posicao valida.
             with lock:
-                relacao_pos_file[evento] = pos_inicial + len(completo)
+                relacao_pos_file[inode_number] = pos_inicial + len(completo)
             servico_do_evento = os.path.basename(os.path.dirname(evento))
             pre_filtro(novas_linhas, regras, servico_do_evento)
 
