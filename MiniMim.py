@@ -24,17 +24,19 @@ if not all(VARIAVEIS_DE_AMBIENTE):
     raise SystemExit()
 
 caminho_de_configuracao = os.getenv('CONFIGURATION_FILE')
-log_path = os.getenv('LOG_PATH').split(',')
-diretorio_de_estado = os.getenv('STATE_DIR')
-arquivo_de_estado = os.getenv('STATE_FILE')
-log_from_logging = logging.getLogger(__name__)
-url = os.getenv('API_URL')
-apifile_path = os.getenv('API_FILE_PATH', 'Configuration_Files/')
-api_SS = os.getenv('API_SS_FILE', 'API_SS.json')
-qtd = 0
-batch_de_logs = {}
-ultimo_envio = time.monotonic()
-lock = threading.Lock()
+log_path                = os.getenv('LOG_PATH').split(',')
+diretorio_de_estado     = os.getenv('STATE_DIR')
+arquivo_de_estado       = os.getenv('STATE_FILE')
+log_from_logging        = logging.getLogger(__name__)
+url                     = os.getenv('API_URL')
+apifile_path            = os.getenv('API_FILE_PATH', 'Configuration_Files/')
+api_SS                  = os.getenv('API_SS_FILE', 'API_SS.json')
+qtd                     = 0
+batch_de_logs           = {}
+ultimo_envio            = time.monotonic()
+lock                    = threading.Lock()
+session                 = requests.Session()
+secret_key              = os.getenv("API_KEY")
 
 # Fecha o lote por tamanho; o que sobrar sai por tempo no --observe.
 TAMANHO_DO_LOTE = 100
@@ -261,11 +263,12 @@ def salvar_logs(apifile_path,api_SS):
 
 def envio_para_API(batch_de_logs):
     """Envia o log classificado para o centralizador."""
-    headers = {"Content-Type": "application/json"}
+    headers = {"Authorization":secret_key,"Content-Type": "application/json"}
     data = {"batch": batch_de_logs}
 
     try:
-        response = requests.post(url, json=data, headers=headers, timeout=5)
+        #response = requests.post(url, json=data, headers=headers, timeout=5)
+        response = session.post(url, json=data, headers=headers, timeout=5)
         if response.status_code == 200:
             return True
         else:

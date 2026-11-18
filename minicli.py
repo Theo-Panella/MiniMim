@@ -257,6 +257,7 @@ def executa_tutorial():
     # ---- 3. endereço da API ---------------------------------------------
     titulo("🌐 3/4 - Endereço da API")
     endereco_api = pergunta("Endereço da API - http://[Endereço]:8000", padrao="127.0.0.1")
+    api_key      = pergunta("Secret key da API", padrao="M4st&r-k&yFoR-LogR&l4y")
 
 
     # ---- 4. resumo e gravacao ---------------------------------------------
@@ -303,6 +304,7 @@ def executa_tutorial():
     set_key(CAMINHO_ENV, "API_URL", f"http://{endereco_api}:8000")
     set_key(CAMINHO_ENV, "API_FILE_PATH", f"{diretorio_json}/")
     set_key(CAMINHO_ENV, "API_SS_FILE", f"API_SS.json")
+    set_key(CAMINHO_ENV, "API_KEY", api_key)
     sucesso(f"{escape(os.path.abspath(CAMINHO_ENV))} atualizado.")
 
     console.print()
