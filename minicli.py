@@ -7,6 +7,8 @@ import random
 import tempfile
 
 import yaml
+import hashlib
+import hmac
 import time
 import portalocker
 import requests
@@ -357,8 +359,12 @@ def envia_lotes_pendentes(apifile_path, api_SS):
     if not lotes_pendentes:
         sucesso("Nenhum lote pra enviar. Tudo em dia! 😎")
         return
+    
+    if not os.getenv("API_KEY"):
+        aviso("Chave de API inexistente, configure e tente novamente. 🤷")
+        return 
 
-    headers = {"Content-Type": "application/json"}
+    secret_key = os.getenv("API_KEY")
     enviados = 0
 
     # Itera sobre uma copia: cada lote enviado com sucesso sai de lotes_pendentes
@@ -366,7 +372,11 @@ def envia_lotes_pendentes(apifile_path, api_SS):
     # nao reenvia de novo o que ja foi despachado.
     for lote in list(lotes_pendentes):
         try:
-            response = requests.post(url, json={"batch": lote}, headers=headers, timeout=5)
+            batch = {"batch": lote}
+            payload_utf8, secret_key_utf8 = json.dumps(batch).encode("utf8"), (secret_key.encode("utf8"))
+            assinatura = hmac.new(secret_key_utf8, payload_utf8, hashlib.sha256).hexdigest()
+            headers = {"Signature": assinatura}
+            response = requests.post(url, json=batch, headers=headers, timeout=5)
         except requests.exceptions.ConnectionError as erro:
             aviso(f"A API está tirando um cochilo 😴 error={escape(str(erro))}")
             # Sem conexao com a API agora, os lotes seguintes tambem vao falhar.

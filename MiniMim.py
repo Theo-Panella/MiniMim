@@ -11,12 +11,15 @@ import portalocker
 import tempfile
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers.polling import PollingObserver as Observer
+import hmac
+import hashlib
 #from watchdog.observers import Observer
 
 load_dotenv()
 
 VARIAVEIS_DE_AMBIENTE = [os.getenv('CONFIGURATION_FILE'), os.getenv('LOG_PATH'),
-                         os.getenv('STATE_DIR'), os.getenv('API_URL'), os.getenv('STATE_FILE')]
+                         os.getenv('STATE_DIR'), os.getenv('API_URL'), os.getenv('STATE_FILE'),
+                         os.getenv('API_KEY'), os.getenv('API_FILE_PATH')]
 
 # Checar variaveis de ambiente
 if not all(VARIAVEIS_DE_AMBIENTE):
@@ -263,8 +266,10 @@ def salvar_logs(apifile_path,api_SS):
 
 def envio_para_API(batch_de_logs):
     """Envia o log classificado para o centralizador."""
-    headers = {"Authorization":secret_key,"Content-Type": "application/json"}
-    data = {"batch": batch_de_logs}
+    data = {"batch" : batch_de_logs}
+    payload_utf8, secret_key_utf8 =  json.dumps(data).encode("utf8"), (secret_key.encode("utf8"))
+    assinatura = hmac.new(secret_key_utf8, payload_utf8, hashlib.sha256).hexdigest()
+    headers = {"Signature": assinatura}
 
     try:
         #response = requests.post(url, json=data, headers=headers, timeout=5)

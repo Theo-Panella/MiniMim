@@ -38,7 +38,7 @@ O MiniMim inverte a lógica. Ele roda **no próprio endpoint**, acompanha seus a
 
 ```
  arquivos de log ──► watchdog ──► pré-filtro (regex) ──► lote de 100 ──► API central
-   (por serviço)    linhas novas   regra mais específica   POST /        (api.py)
+   (por serviço)    linhas novas   regra mais específica   POST /        (LogRelay)
                                    vence                       │
                                                                └─ falhou? salva em API_SS.json
                                                                   e reenvia com `minicli -sta`
@@ -59,7 +59,7 @@ O MiniMim inverte a lógica. Ele roda **no próprio endpoint**, acompanha seus a
 MiniMim/
 ├── minicli.py                 # CLI: tutorial, carga inicial e observação
 ├── MiniMim.py                 # agente principal: watchdog + pré-filtro
-├── api.py                     # centralizador de logs (Flask), recebe os POSTs do agente
+├── api.py                     # API de teste (Flask), recebe os POSTs do agente
 ├── Configuration_Files/
 │   ├── filter.yaml            # regras de filtragem, uma seção por serviço
 │   └── filestate.json         # índice de leitura por arquivo
@@ -97,6 +97,7 @@ STATE_FILE = Configuration_Files/filestate.json
 API_URL = http://127.0.0.1:8000
 API_FILE_PATH = Configuration_Files/
 API_SS_FILE = API_SS.json
+API_KEY = sua-chave-secreta
 ```
 
 | Variável | Para que serve |
@@ -105,19 +106,24 @@ API_SS_FILE = API_SS.json
 | `CONFIGURATION_FILE` | Caminho do `filter.yaml` |
 | `STATE_FILE` | Arquivo onde o índice de leitura é gravado |
 | `STATE_DIR` | Diretório do `STATE_FILE`, usado para a gravação atômica (arquivo temporário + troca) |
-| `API_URL` | Endereço do centralizador (`api.py`) |
+| `API_URL` | Endereço do centralizador ([LogRelay](https://github.com/Theo-Panella/LogRelay.git) ou o `api.py` de teste) |
 | `API_FILE_PATH` / `API_SS_FILE` | Onde ficam os lotes que falharam o envio, pendentes de reenvio |
+| `API_KEY` | Chave compartilhada com a API, usada para assinar cada lote |
+
+#### Autenticação
+
+Cada lote enviado (na coleta e no reenvio com `-sta`) é assinado com HMAC-SHA256: o agente calcula a assinatura do corpo JSON usando a `API_KEY` e a envia no header `Signature`. A API recalcula a assinatura com a mesma chave e recusa o lote se não bater. Use em `API_KEY` a mesma chave configurada na API; a chave padrão do tutorial e do `.env.example` serve só para teste.
 
 ### 2. Suba a API
 
-A API precisa estar de pé antes da coleta. O `gunicorn` só roda em Linux (ele importa `fcntl`), então no Windows use o `waitress`:
+A API precisa estar de pé antes da coleta. A recomendação é usar o [LogRelay](https://github.com/Theo-Panella/LogRelay.git), que valida a assinatura dos lotes. Para testes locais há o `api.py`. O `gunicorn` só roda em Linux (ele importa `fcntl`), então no Windows use o `waitress`:
 
 ```bash
 waitress-serve --host=127.0.0.1 --port=8000 api:app   # Windows
 gunicorn --bind 127.0.0.1:8000 api:app                # Linux
 ```
 
-> O `api.py` é, por enquanto, um receptor de teste: não tem autenticação e apenas imprime o que recebe.
+> O `api.py` é só um receptor de teste: ignora o header `Signature` e apenas imprime o que recebe.
 
 ### 3. Colete
 
@@ -146,24 +152,24 @@ Um clone novo não tem logs de amostra (`*.log` está no `.gitignore`). O `escre
 docker compose up -d --build
 ```
 
-Sobe dois serviços:
+Sobe só o serviço **`agent`**, na rede `public`. Ele sobe com `sleep infinity` e não coleta nada sozinho; a coleta é disparada com `docker compose exec`.
 
-- **`api`**: expõe a porta `8000` no host e fica nas redes `public` e `iso`.
-- **`agent`**: fica só na rede `iso`, que é interna, e fala com a API pelo nome do serviço (`http://api:8000`). Ele sobe com `sleep infinity` e não coleta nada sozinho; a coleta é disparada com `docker compose exec`.
+A API não faz parte do compose. A recomendação é subir o [LogRelay](https://github.com/Theo-Panella/LogRelay.git) à parte e apontar o `API_URL` para ele. Se quiser usar o `api.py` de teste dentro do compose, descomente o bloco `api` no `compose.yml`: ele sobe com `gunicorn` na porta `8000`, e as redes que ele referencia precisam existir em `networks`.
 
-O `.env` **não** é gerado dentro do container, e o `compose.yml` falha se ele não existir no host. Rode o tutorial no host antes de subir, ou renomeie `.env.example` para `.env` e rode 
+O `.env` **não** é gerado dentro do container, e o `compose.yml` falha se ele não existir no host. Rode o tutorial no host antes de subir, ou renomeie `.env.example` para `.env`:
 
 ```bash
 python minicli.py -t
-````
+```
 
-E ajuste os caminhos que precisam apontar para o filesystem do container (prefixo `/app/`). O `.env.example` já traz um modelo:
+Depois ajuste os caminhos que precisam apontar para o filesystem do container (prefixo `/app/`). O `.env.example` já traz um modelo:
 
 ```dotenv
 LOG_PATH = /app/Log_paths/Apache,/app/Log_paths/Openssh
 CONFIGURATION_FILE = /app/Configuration_Files/filter.yaml
-API_URL = http://api:8000
+API_URL = http://api:8000          # troque pelo endereço do LogRelay
 API_FILE_PATH = /app/Configuration_Files/
+API_KEY = sua-chave-secreta        # a mesma chave configurada na API
 ```
 
 Antes de subir, **monte os logs no serviço `agent`**. No `compose.yml`, em `agent > volumes`, descomente a linha de exemplo e troque `[caminho_original]` pela pasta de logs do host:
@@ -174,7 +180,7 @@ Antes de subir, **monte os logs no serviço `agent`**. No `compose.yml`, em `age
       - ./Log_paths:/app/Log_paths:ro      # linha que você descomenta e ajusta
 ```
 
-O destino dentro do container (`/app/Log_paths`) precisa bater com os caminhos do `LOG_PATH` no `.env`. Sem essa linha o agente não enxerga nenhum log e a coleta termina sem enviar nada.
+O destino dentro do container (`/app/Log_paths`) precisa bater com os caminhos do `LOG_PATH` no `.env`. Sem essa montagem o agente não enxerga nenhum log e a coleta termina sem enviar nada.
 
 Com tudo no ar, dispare a coleta:
 
@@ -206,7 +212,7 @@ Usei o [Claude Code](https://claude.com/claude-code) como par de programação e
 - [x] Tratar truncamento do arquivo de log, reiniciando a leitura do zero
 - [x] Fazer a tratativa de logs com API fora do ar
 - [x] Tratar rotação, com o arquivo renomeado ou recriado
-- [ ] Implementar Autenticação de API
+- [x] Implementar Autenticação de API
 
 ### Correções pendentes
 
@@ -226,4 +232,5 @@ Levantadas em revisão do código, em ordem de severidade.
 - [ ] Tratar arquivos tmp de filestate que sobram ao interromper `minicli -l`
 - [X] Respeitar o lote de 100 no `--observe`, sem despachar a cada evento multilinha
 - [ ] Rotação: copytruncate e reuso de inode (fingerprint no índice)
+- [X] Validar a `API_KEY` na inicialização do `MiniMim.py`: sem ela, o primeiro envio quebra e o lote não é salvo para reenvio
 - [ ] Enviar para a API fora do lock, para não travar a thread do watchdog por até 5s
