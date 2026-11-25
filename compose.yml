@@ -1,18 +1,19 @@
 services:
-  api:
-    build: .
-    networks:
-      - public
-      - iso
-    ports:
-      - 8000:8000
-
-    command: gunicorn --bind 0.0.0.0:8000 api:app
+  ## API DE TESTE
+  # Recomendação: Usar API LogRelay em - https://github.com/Theo-Panella/LogRelay.git
+  #api:
+  #  build: .
+  #  networks:
+  #    - public
+  #    - iso
+  #  ports:
+  #    - 8000:8000
+  #  command: gunicorn --bind 0.0.0.0:8000 api:app
 
   agent:
     build: .
     networks:
-      - iso
+      - public
       
     # Adicione os logs que forem ser coletado no volume abaixo
     volumes:
@@ -20,15 +21,10 @@ services:
       # [caminho_original]:/app/Log_paths:ro
     env_file:
       - .env
-    depends_on:
-      - api
-
-
     command: sleep infinity
 
 networks:
-  iso:
-    internal: true
   public:
+    driver: bridge
 
 

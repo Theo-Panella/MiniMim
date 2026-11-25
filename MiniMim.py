@@ -11,12 +11,15 @@ import portalocker
 import tempfile
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers.polling import PollingObserver as Observer
+import hmac
+import hashlib
 #from watchdog.observers import Observer
 
 load_dotenv()
 
 VARIAVEIS_DE_AMBIENTE = [os.getenv('CONFIGURATION_FILE'), os.getenv('LOG_PATH'),
-                         os.getenv('STATE_DIR'), os.getenv('API_URL'), os.getenv('STATE_FILE')]
+                         os.getenv('STATE_DIR'), os.getenv('API_URL'), os.getenv('STATE_FILE'),
+                         os.getenv('API_KEY'), os.getenv('API_FILE_PATH')]
 
 # Checar variaveis de ambiente
 if not all(VARIAVEIS_DE_AMBIENTE):
@@ -24,17 +27,19 @@ if not all(VARIAVEIS_DE_AMBIENTE):
     raise SystemExit()
 
 caminho_de_configuracao = os.getenv('CONFIGURATION_FILE')
-log_path = os.getenv('LOG_PATH').split(',')
-diretorio_de_estado = os.getenv('STATE_DIR')
-arquivo_de_estado = os.getenv('STATE_FILE')
-log_from_logging = logging.getLogger(__name__)
-url = os.getenv('API_URL')
-apifile_path = os.getenv('API_FILE_PATH', 'Configuration_Files/')
-api_SS = os.getenv('API_SS_FILE', 'API_SS.json')
-qtd = 0
-batch_de_logs = {}
-ultimo_envio = time.monotonic()
-lock = threading.Lock()
+log_path                = os.getenv('LOG_PATH').split(',')
+diretorio_de_estado     = os.getenv('STATE_DIR')
+arquivo_de_estado       = os.getenv('STATE_FILE')
+log_from_logging        = logging.getLogger(__name__)
+url                     = os.getenv('API_URL')
+apifile_path            = os.getenv('API_FILE_PATH', 'Configuration_Files/')
+api_SS                  = os.getenv('API_SS_FILE', 'API_SS.json')
+qtd                     = 0
+batch_de_logs           = {}
+ultimo_envio            = time.monotonic()
+lock                    = threading.Lock()
+session                 = requests.Session()
+secret_key              = os.getenv("API_KEY")
 
 # Fecha o lote por tamanho; o que sobrar sai por tempo no --observe.
 TAMANHO_DO_LOTE = 100
@@ -89,7 +94,7 @@ def cria_observer():
     except KeyboardInterrupt:
         observer.stop()
     finally:
-        print("Observador Morto")
+        print("\nObservador Morto")
         observer.join()
 
 
@@ -100,21 +105,30 @@ class MyEventHandler(FileSystemEventHandler):
         self._pos = 0
 
     def on_any_event(self, event: FileSystemEvent) -> None:
-        if event.event_type == "modified" and not event.is_directory:
-            popula_indice(event.src_path)
-
+        try:
+            if (event.event_type == "modified" and not event.is_directory) or (event.event_type == "created" and not event.is_directory):
+                popula_indice(event.src_path)
+        except Exception as error:
+            print(f"Error: {error}")
+            return
 
 def popula_indice(evento):
-    if evento not in relacao_pos_file or os.path.getsize(evento) < relacao_pos_file[evento]:
-        relacao_pos_file[evento] = 0
-        ler_arquivo(evento)
-    else:
-        ler_arquivo(evento)
+    try:
+        inode_number = str(os.stat(evento).st_ino)
+        if inode_number not in relacao_pos_file or os.path.getsize(evento) < relacao_pos_file[inode_number]:
+            relacao_pos_file[inode_number] = 0
+            ler_arquivo(evento)
+        else:
+            ler_arquivo(evento)
+    except Exception as error:
+        print(f"Error:{error}")
+        return
 
 def ler_arquivo(evento):
     try:
         with portalocker.Lock(evento, mode="rb",timeout=1 ) as file:
-            pos_inicial = relacao_pos_file[evento]
+            inode_number = str(os.stat(evento).st_ino)
+            pos_inicial = relacao_pos_file[inode_number]
             file.seek(pos_inicial)
             conteudo = file.read()
 
@@ -130,7 +144,7 @@ def ler_arquivo(evento):
             # seek() em modo texto so aceita posicoes vindas de tell(),
             # entao relemos so o trecho completo para obter uma posicao valida.
             with lock:
-                relacao_pos_file[evento] = pos_inicial + len(completo)
+                relacao_pos_file[inode_number] = pos_inicial + len(completo)
             servico_do_evento = os.path.basename(os.path.dirname(evento))
             pre_filtro(novas_linhas, regras, servico_do_evento)
 
@@ -173,10 +187,10 @@ def despacha_lote():
     ultimo_envio = time.monotonic()
     try:
         if qtd:
-            if envio_para_API(batch_de_logs) == True:
-                clear_batch()
-                soma_mais_um(True)
-                escreve_ponteiro(relacao_pos_file)
+            envio_para_API(batch_de_logs)
+            clear_batch()
+            soma_mais_um(True)
+            escreve_ponteiro(relacao_pos_file)
 
     except Exception as e:
         print(f"Depacha_lote, Error={e}")
@@ -252,11 +266,14 @@ def salvar_logs(apifile_path,api_SS):
 
 def envio_para_API(batch_de_logs):
     """Envia o log classificado para o centralizador."""
-    headers = {"Content-Type": "application/json"}
-    data = {"batch": batch_de_logs}
+    data = {"batch" : batch_de_logs}
+    payload_utf8, secret_key_utf8 =  json.dumps(data).encode("utf8"), (secret_key.encode("utf8"))
+    assinatura = hmac.new(secret_key_utf8, payload_utf8, hashlib.sha256).hexdigest()
+    headers = {"Signature": assinatura}
 
     try:
-        response = requests.post(url, json=data, headers=headers, timeout=5)
+        #response = requests.post(url, json=data, headers=headers, timeout=5)
+        response = session.post(url, json=data, headers=headers, timeout=5)
         if response.status_code == 200:
             return True
         else:
