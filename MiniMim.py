@@ -13,6 +13,7 @@ from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers.polling import PollingObserver as Observer
 import hmac
 import hashlib
+from datetime import datetime, timezone
 #from watchdog.observers import Observer
 
 load_dotenv()
@@ -266,10 +267,11 @@ def salvar_logs(apifile_path,api_SS):
 
 def envio_para_API(batch_de_logs):
     """Envia o log classificado para o centralizador."""
+    time_stamp = datetime.now(timezone.utc).isoformat()
     data = {"batch" : batch_de_logs}
-    payload_utf8, secret_key_utf8 =  json.dumps(data).encode("utf8"), (secret_key.encode("utf8"))
+    payload_utf8, secret_key_utf8 =  (json.dumps(data).encode("utf8") + time_stamp.encode("utf8")), (secret_key.encode("utf8"))
     assinatura = hmac.new(secret_key_utf8, payload_utf8, hashlib.sha256).hexdigest()
-    headers = {"Signature": assinatura}
+    headers = {"TimeStamp":time_stamp ,"Signature": assinatura}
 
     try:
         #response = requests.post(url, json=data, headers=headers, timeout=5)
