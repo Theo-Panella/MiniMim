@@ -234,3 +234,4 @@ Levantadas em revisão do código, em ordem de severidade.
 - [ ] Rotação: copytruncate e reuso de inode (fingerprint no índice)
 - [X] Validar a `API_KEY` na inicialização do `MiniMim.py`: sem ela, o primeiro envio quebra e o lote não é salvo para reenvio
 - [ ] Enviar para a API fora do lock, para não travar a thread do watchdog por até 5s
+- [ ] Adicionar base de codigo com pytest para pipeline de verificação no githubActions
