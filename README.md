@@ -229,7 +229,7 @@ Levantadas em revisão do código, em ordem de severidade.
 
 - [X] Não persistir a posição de leitura quando o `pre_filtro` levanta exceção
 - [ ] Não avançar o ponteiro de um serviço que ainda não tem regras no `filter.yaml`
-- [ ] Tratar arquivos tmp de filestate que sobram ao interromper `minicli -l`
+- [X] Tratar arquivos tmp de filestate que sobram ao interromper `minicli -l`
 - [X] Respeitar o lote de 100 no `--observe`, sem despachar a cada evento multilinha
 - [ ] Rotação: copytruncate e reuso de inode (fingerprint no índice)
 - [X] Validar a `API_KEY` na inicialização do `MiniMim.py`: sem ela, o primeiro envio quebra e o lote não é salvo para reenvio

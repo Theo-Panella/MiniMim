@@ -154,14 +154,22 @@ def ler_arquivo(evento):
 
 # Funções Auxiliares de escrita
 def escreve_ponteiro(relacao_pos_file):
-    # Grava num arquivo temporario no mesmo diretorio e troca com os.replace,
-    # que e atomico: nunca deixa o arquivo de indice pela metade.
-    with tempfile.NamedTemporaryFile('w', dir=diretorio_de_estado, delete=False) as f_temp:
-        json.dump(relacao_pos_file,f_temp)
-        f_temp.flush()
-        os.fsync(f_temp.fileno())
+    arquivo_temp = None
+    try:
+        # Grava num arquivo temporario no mesmo diretorio e troca com os.replace,
+        # que e atomico: nunca deixa o arquivo de indice pela metade.
+        with tempfile.NamedTemporaryFile('w', dir=diretorio_de_estado, delete=False) as f_temp:
+            arquivo_temp = f_temp
+            json.dump(relacao_pos_file,f_temp)
+            f_temp.flush()
+            os.fsync(f_temp.fileno())
 
-    os.replace(f_temp.name, arquivo_de_estado)
+        os.replace(f_temp.name, arquivo_de_estado)
+    except BaseException:
+        if os.path.exists(arquivo_temp.name):
+            os.remove(arquivo_temp.name)
+        print("Dependencias apagadas, devido erro de escrita ao arquivo de estado")
+        raise 
 
 
 def soma_mais_um(zera: bool):

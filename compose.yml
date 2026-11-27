@@ -18,6 +18,7 @@ services:
     # Adicione os logs que forem ser coletado no volume abaixo
     volumes:
       - ./Configuration_Files:/app/Configuration_Files:rw
+      - ./Log_paths:/app/Log_paths:ro
       # [caminho_original]:/app/Log_paths:ro
     env_file:
       - .env
